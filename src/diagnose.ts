@@ -102,7 +102,15 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
 
   if (statusMatch && statusMatch[2] !== "unknown") {
     const status = Number(statusMatch[2] ?? statusMatch[1]);
-    return d(layerForStatus(status), status === 403 ? "likely" : "certain", "exa-status", [quote(text), `HTTP ${status}`]);
+    const dx = d(layerForStatus(status), status === 403 ? "likely" : "certain", "exa-status", [quote(text), `HTTP ${status}`]);
+    // Exa's support asks for the requestId, but this server version never passes it on.
+    // Point support at the evidence that is there: the timestamp.
+    const stamp = text.match(/Timestamp: (\S+)/)?.[1];
+    if (!/req(uest)?[_ ]?id/i.test(text)) {
+      dx.facts.push("No Exa requestId or error tag in the agent's text.");
+      if (stamp) dx.nextStep += ` The requestId is missing, so search Exa's request log near ${stamp}.`;
+    }
+    return dx;
   }
 
   if (EXA_PLAIN_ERROR.test(text)) {

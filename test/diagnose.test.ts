@@ -47,6 +47,12 @@ describe("agent-view diagnosis, one case per rule", () => {
     expect(diagnoseAgentView(ev("HTTP 400 {\"detail\":\"Connector is not safe\"}", { outcome: "transport-error" })).layer).toBe("client");
   });
 
+  it("points support at the timestamp when the requestId is missing", () => {
+    const dx = diagnoseAgentView(ev("web_search_exa error (429): Rate limit exceeded\nTimestamp: 2026-11-15T21:31:21.094Z"));
+    expect(dx.facts).toContain("No Exa requestId or error tag in the agent's text.");
+    expect(dx.nextStep).toContain("2026-11-15T21:31:21.094Z");
+  });
+
   it("keeps observed facts and inference apart", () => {
     const dx = diagnoseAgentView(ev("web_search_exa error: fetch failed"));
     expect(dx.facts.join(" ")).toContain("fetch failed");

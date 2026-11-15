@@ -73,3 +73,27 @@ Remaining generated misses are the two known limits from round 1. The blind vari
 - A tool rejecting an argument combination ("search type 'lite' does not support maxAgeHours") was called a server exception, not invalid input.
 
 Live drift now reads: `web_search_exa` added `objective (required)` in production 3.5.1.
+
+## Round 3: simplicity, a clean clone, and docs
+
+Changes:
+- Closed the two variant-2 gaps with rules traced to a source: a 401 outside a tool result is auth (the hosted server's own login challenge, probed live), and messages ending in "does not support ... Remove it" are the tools' own input checks (`src/tools/webSearchAdvanced.ts`), so protocol.
+- When an Exa error reaches the agent without a requestId, the diagnosis says so and points support at the Timestamp line instead. This changes wording, not the layer, so no score moved.
+- Removed an identity wrapper (`defineScenarios`) and a label no scenario used (`manual`; manual checks have their own file).
+- Added LICENSE and `.gitattributes`.
+- A new blind batch, variant-3 (8 cases), was written after these changes and scored once.
+
+Fresh clone: `git clone`, `npm ci`, `npm run setup`, `npm test`, `npm run lab` in a new folder, following only the README, run on the final commit. All tests pass and the scores match the run above.
+
+| Set | Evidence | Round 2 | Round 3 |
+|---|---|---|---|
+| generated | agent view | 28/32 | 28/32 |
+| generated | full | 32/32 | 32/32 |
+| real | agent view | 5/5 | 5/5 (not blind) |
+| variant | agent view | 13/14 | 13/14 (not blind) |
+| variant-2 | agent view | 10/12 (blind) | 12/12 (not blind) |
+| variant-3 | agent view | n/a | 5/8 (blind) |
+
+The blind variant-3 misses all hit the same weak rule: text in no known format falls back to client. It was right for the Nov 9 case, but it also caught `connect ETIMEDOUT` (network), a hosted HTTP 429 outside a tool result (exa-api) and "exited with code 1" (mcp-server). Rules were not changed after this score, so 5/8 stands as the current blind number.
+
+Next, if this continues: add those three patterns with sources, send unrecognized text to "unknown" instead of client, and score a new blind batch.
