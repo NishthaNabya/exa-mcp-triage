@@ -6,17 +6,19 @@ import { LAYERS, type Diagnosis, type LayerOrNone } from "./types.js";
 
 export interface EvalItem {
   id: string;
-  set: "generated" | "real" | "variant" | "variant-2" | "variant-3";
+  set: "generated" | "real" | "variant" | "variant-2" | "variant-3" | "variant-4";
   mode: "agent-view" | "full";
   expected: LayerOrNone;
-  predicted: LayerOrNone;
+  predicted: Diagnosis["layer"];
   rule: string;
 }
 
 export interface Score {
   n: number;
   correct: number;
-  accuracy: number;
+  accuracy: number; // over all cases; an "unknown" counts as not correct
+  abstained: number; // said "unknown"
+  wrong: number; // named a layer, and it was the wrong one
   falsePositives: number; // said something failed when nothing did
   falseNegatives: number; // said nothing failed when something did
   perLayer: { layer: LayerOrNone; n: number; precision: number | null; recall: number | null }[];
@@ -58,6 +60,7 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
     ["variant", "agent-view"],
     ["variant-2", "agent-view"],
     ["variant-3", "agent-view"],
+    ["variant-4", "agent-view"],
   ] as const;
   const scores = groups.map(([set, mode]) => ({ set, mode, score: score(items.filter((i) => i.set === set && i.mode === mode)) }));
   return { items, scores, unscored };
@@ -74,11 +77,14 @@ export function score(items: EvalItem[]): Score {
       return { layer, n: actual, precision: predicted ? tp / predicted : null, recall: actual ? tp / actual : null };
     })
     .filter((l) => l.n > 0 || l.precision !== null);
+  const abstained = items.filter((i) => i.predicted === "unknown").length;
   return {
     n: items.length,
     correct,
     accuracy: items.length ? correct / items.length : 0,
-    falsePositives: items.filter((i) => i.expected === "none" && i.predicted !== "none").length,
+    abstained,
+    wrong: items.length - correct - abstained,
+    falsePositives: items.filter((i) => i.expected === "none" && i.predicted !== "none" && i.predicted !== "unknown").length,
     falseNegatives: items.filter((i) => i.expected !== "none" && i.predicted === "none").length,
     perLayer,
   };

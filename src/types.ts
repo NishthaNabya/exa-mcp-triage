@@ -57,7 +57,7 @@ export interface Evidence {
 }
 
 export interface Diagnosis {
-  layer: LayerOrNone;
+  layer: LayerOrNone | "unknown"; // "unknown" means the evidence does not support a layer; better than a wrong guess
   confidence: "certain" | "likely" | "unknown";
   facts: string[]; // observed, quoted from evidence
   inference?: string; // our reading of the facts, kept separate

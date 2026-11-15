@@ -29,6 +29,14 @@ describe("score", () => {
     ]);
     expect(s).toMatchObject({ n: 3, correct: 1, falsePositives: 1, falseNegatives: 1 });
   });
+
+  it("counts unknown as an abstention, not a wrong layer", () => {
+    const s = score([
+      { id: "a", set: "variant-4", mode: "agent-view", expected: "edge", predicted: "unknown", rule: "" },
+      { id: "b", set: "variant-4", mode: "agent-view", expected: "edge", predicted: "client", rule: "" },
+    ]);
+    expect(s).toMatchObject({ correct: 0, abstained: 1, wrong: 1, falsePositives: 0 });
+  });
 });
 
 describe("schema checks", () => {

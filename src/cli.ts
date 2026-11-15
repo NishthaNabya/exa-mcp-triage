@@ -96,7 +96,7 @@ writeFileSync(join(reportDir, "index.html"), renderHtml(safe));
 const count = (v: ScenarioResult["verdict"]) => run.results.filter((r) => r.verdict === v).length;
 console.log(`\n${run.results.length} scenarios: ${count("pass")} pass, ${count("as-expected")} as expected, ${count("reproduced")} reproduced defects, ${count("not-reproduced")} not reproduced, ${count("regressed")} regressed, ${count("unexpected")} unexpected, ${count("error")} lab errors`);
 for (const s of run.evaluation.scores) {
-  if (s.score.n) console.log(`diagnosis ${s.set}/${s.mode}: ${s.score.correct}/${s.score.n} correct (${Math.round(s.score.accuracy * 100)}%)`);
+  if (s.score.n) console.log(`diagnosis ${s.set}/${s.mode}: ${s.score.correct}/${s.score.n} correct (${Math.round(s.score.accuracy * 100)}%), ${s.score.wrong} wrong, ${s.score.abstained} unknown`);
 }
 if (run.evaluation.reproducibility) {
   const r = run.evaluation.reproducibility;

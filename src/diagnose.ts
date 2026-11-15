@@ -18,7 +18,15 @@ const SDK_ERROR = /^MCP error (-?\d+): /; // the MCP SDK's own errors, e.g. -326
 const LEGACY_STATUS = /Request failed with status code (\d{3})/; // older Exa MCP and axios wording
 
 const HTML_PAGE = /<!DOCTYPE html|<html[\s>]|cloudflare|Ray ID|cf-ray/i;
-const NO_RESPONSE = /fetch failed|ECONNREFUSED|ENOTFOUND|ECONNRESET|EAI_AGAIN|getaddrinfo|socket hang up/i;
+// Node's system errors for a request that got no response (nodejs.org/api/errors.html#common-system-errors).
+const NO_RESPONSE = /fetch failed|ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|EPIPE|EAI_AGAIN|getaddrinfo|socket hang up/i;
+// The server process never ran: bad command, missing file, or no permission.
+const NOT_STARTED = /ENOENT|EACCES|spawn|Cannot find module/i;
+// The server process ran and then died.
+const PROCESS_DIED = /connection closed|exited with code|process exited|SIGKILL|SIGTERM/i;
+// Claude and ChatGPT call remote MCP servers "connectors". Exa's server never uses the word
+// in anything it sends (only in source comments), so text that does came from the client.
+const CLIENT_VOCABULARY = /\bconnector\b/i;
 const SERVER_TIMEOUT = /timed out after (\d+)s/; // withTimeout() in errorHandler.ts
 const SERVER_REJECTED_INPUT = /does not support|is not supported|Remove (it|them)\b/;
 const SERVER_TOOL_LIMIT_MS = 60_000; // API_CONFIG.TOOL_TIMEOUTS.SEARCH_MS and FETCH_MS in src/tools/config.ts
@@ -32,6 +40,8 @@ const NEXT: Record<Layer, string> = {
   "mcp-server": "Reproduce with the same arguments against the pinned server and compare what it sent to Exa with what the agent asked for.",
   "exa-api": "Look up the status and tag on Exa's error-codes page. For billing or rate limits, check the dashboard.",
 };
+const NEXT_NONE = "Nothing failed from the agent's point of view.";
+const NEXT_UNKNOWN = "This text matches no known format. Ask for the client's own log and the time of the call, then check Exa's request log for that time: no request there means the failure happened before Exa.";
 
 const d = (layer: Diagnosis["layer"], confidence: Diagnosis["confidence"], rule: string, facts: string[], inference?: string): Diagnosis => ({
   layer,
@@ -39,7 +49,7 @@ const d = (layer: Diagnosis["layer"], confidence: Diagnosis["confidence"], rule:
   rule,
   facts,
   ...(inference && { inference }),
-  nextStep: layer === "none" ? "Nothing failed from the agent's point of view." : NEXT[layer],
+  nextStep: layer === "none" ? NEXT_NONE : layer === "unknown" ? NEXT_UNKNOWN : NEXT[layer],
 });
 
 /** Status codes, read the way Exa documents them (exa.ai/docs/admin/error-codes). */
@@ -82,8 +92,8 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
   if (sdk?.[1]?.startsWith("-326")) return d("protocol", sdk[1] === "-32602" ? "certain" : "likely", "mcp-sdk-error", [quote(text)]);
 
   if (agent.outcome === "transport-error") {
-    if (/ENOENT|EACCES|spawn/i.test(text)) return d("client", "likely", "server-not-started", [quote(text)], "The client could not start the server process.");
-    if (/connection closed/i.test(text)) return d("mcp-server", "likely", "server-closed", [quote(text)], "The server process exited or closed the connection.");
+    if (NOT_STARTED.test(text)) return d("client", "likely", "server-not-started", [quote(text)], "The client could not start the server process.");
+    if (PROCESS_DIED.test(text)) return d("mcp-server", "likely", "server-closed", [quote(text)], "The server process exited or closed the connection.");
     if (NO_RESPONSE.test(text)) return d("network", "likely", "transport-no-response", [quote(text)]);
     // Anything else falls through to the edge and client rules below.
   }
@@ -130,7 +140,11 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
     return d("edge", "likely", "connect-403", [quote(text)], "Exa asks for auth with 401, so a 403 before any MCP response points to the edge.");
   }
   if (HTML_PAGE.test(text)) return d("edge", "likely", "html-page-outside-tool", [quote(text)]);
-  return d("client", "likely", "not-exa-text", [quote(text)], "This text is not in any format Exa's MCP server produces, so the client or a layer in front of it wrote it.");
+  if (CLIENT_VOCABULARY.test(text)) {
+    return d("client", "likely", "client-vocabulary", [quote(text)], "The text talks about a connector, which is the client's word; Exa's server never produces it.");
+  }
+  // Round 3's blind batch showed that guessing "client" here was wrong 3 times out of 3.
+  return d("unknown", "unknown", "no-known-format", [quote(text)], "This text is not in any format Exa's MCP server produces, and it names no layer.");
 }
 
 export function diagnoseFull(e: Evidence): Diagnosis {

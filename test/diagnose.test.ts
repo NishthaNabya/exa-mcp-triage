@@ -47,6 +47,20 @@ describe("agent-view diagnosis, one case per rule", () => {
     expect(diagnoseAgentView(ev("HTTP 400 {\"detail\":\"Connector is not safe\"}", { outcome: "transport-error" })).layer).toBe("client");
   });
 
+  it("says unknown instead of guessing when text matches no known format", () => {
+    const dx = diagnoseAgentView(ev("upstream connect error or disconnect/reset before headers", { outcome: "transport-error" }));
+    expect(dx.layer).toBe("unknown");
+    expect(dx.nextStep).toContain("client's own log");
+  });
+
+  it.each([
+    ["web_search_exa error: connect ETIMEDOUT 104.18.0.1:443", "tool-error", "network"],
+    ["MCP server exa exited with code 1", "transport-error", "mcp-server"],
+    ["Error: Cannot find module '/x/dist/stdio.cjs'", "transport-error", "client"],
+  ] as const)("%s -> %s", (text, outcome, layer) => {
+    expect(diagnoseAgentView(ev(text, { outcome })).layer).toBe(layer);
+  });
+
   it("points support at the timestamp when the requestId is missing", () => {
     const dx = diagnoseAgentView(ev("web_search_exa error (429): Rate limit exceeded\nTimestamp: 2026-11-15T21:31:21.094Z"));
     expect(dx.facts).toContain("No Exa requestId or error tag in the agent's text.");

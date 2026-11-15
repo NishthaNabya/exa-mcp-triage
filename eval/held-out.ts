@@ -9,12 +9,14 @@
 //   Round 2 fixed rule bugs after seeing those results, so later scores are not blind.
 // variant-2: written after the round-2 fixes and scored blind once (10/12); round 3 then
 //   fixed the two gaps it showed, so later scores are not blind.
-// variant-3: written after the round-3 fixes, scored once; rules not changed after.
+// variant-3: written after the round-3 fixes and scored blind once (5/8); round 4 then
+//   changed the fallback rule because of it, so later scores are not blind.
+// variant-4: written after the round-4 changes, scored once; rules not changed after.
 import type { LayerOrNone, Observation } from "../src/types.js";
 
 export interface HeldOutCase {
   id: string;
-  set: "real" | "variant" | "variant-2" | "variant-3";
+  set: "real" | "variant" | "variant-2" | "variant-3" | "variant-4";
   source: string;
   text: string;
   outcome: Observation["outcome"];
@@ -151,4 +153,17 @@ export const heldOut: HeldOutCase[] = [
   { id: "v3-server-exited", set: "variant-3", source: "variant", text: "MCP server exa exited with code 1", outcome: "transport-error", isError: true, expected: "mcp-server", why: "The server process crashed." },
   { id: "v3-no-results", set: "variant-3", source: "variant", text: "No search results found. Please try a different query.", outcome: "success", isError: false, expected: "none", why: "Exa answered with nothing." },
   { id: "v3-401", set: "variant-3", source: "variant", text: "web_fetch_exa error (401): Invalid API key provided\nTimestamp: 2026-11-15T13:00:00.000Z", outcome: "tool-error", isError: true, expected: "auth", why: "Exa-format 401." },
+
+  // ---- variant-4: written after the round-4 changes, before scoring; rules not changed after ----
+  { id: "v4-402", set: "variant-4", source: "variant", text: "web_search_exa error (402): Credit balance exhausted\nTimestamp: 2026-11-15T18:00:00.000Z", outcome: "tool-error", isError: true, expected: "exa-api", why: "Exa-format 402." },
+  { id: "v4-ehostunreach", set: "variant-4", source: "variant", text: "web_fetch_exa error: connect EHOSTUNREACH 10.0.0.1:443", outcome: "tool-error", isError: true, expected: "network", why: "No route to the API host." },
+  { id: "v4-invalid-params", set: "variant-4", source: "variant", text: "MCP error -32602: Invalid params: urls must be an array", outcome: "mcp-error", isError: true, expected: "protocol", why: "Invalid arguments." },
+  { id: "v4-eacces", set: "variant-4", source: "variant", text: "Error: MCP server exa failed to start: spawn node EACCES", outcome: "transport-error", isError: true, expected: "client", why: "The client cannot run the configured command." },
+  { id: "v4-cf-502-transport", set: "variant-4", source: "variant", text: "Request to https://mcp.exa.ai/mcp failed: 502 Bad Gateway <html><head><title>502 Bad Gateway</title></head><body>cloudflare</body></html>", outcome: "transport-error", isError: true, expected: "edge", why: "A Cloudflare page at connect time." },
+  { id: "v4-403-json", set: "variant-4", source: "variant", text: "web_search_exa error (403): Forbidden\nTimestamp: 2026-11-15T18:00:00.000Z", outcome: "tool-error", isError: true, expected: "auth", why: "Exa-format 403 with a JSON body." },
+  { id: "v4-claude-connector", set: "variant-4", source: "variant", text: "Claude couldn't reach the Exa connector. Try again later.", outcome: "tool-error", isError: true, expected: "client", why: "A client's own wording." },
+  { id: "v4-abort-timeout", set: "variant-4", source: "variant", text: "web_search_exa error: The operation was aborted due to timeout", outcome: "tool-error", isError: true, expected: "network", why: "Node's fetch gave up waiting for a response." },
+  { id: "v4-partial", set: "variant-4", source: "variant", text: "# Page\nURL: https://x.example\n\nBody\n\nError fetching https://y.example: CRAWL_FORBIDDEN", outcome: "success", isError: false, expected: "exa-api", why: "One URL failed inside a successful result." },
+  { id: "v4-oom-kill", set: "variant-4", source: "variant", text: "MCP server exa disconnected unexpectedly (process exited with code 137)", outcome: "transport-error", isError: true, expected: "mcp-server", why: "The server process was killed." },
+  { id: "v4-504-json", set: "variant-4", source: "variant", text: "web_search_exa error (504): Gateway timeout\nTimestamp: 2026-11-15T18:00:00.000Z", outcome: "tool-error", isError: true, expected: "exa-api", why: "Exa-format 504 with a JSON body." },
 ];
