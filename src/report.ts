@@ -56,6 +56,12 @@ ${card(surprises.length, "regressed, unexpected or lab errors", surprises.length
 ${defects.length ? `<table><tr><th>Scenario</th><th>What it shows</th><th>Source</th></tr>${defects.map((d) => `<tr><td><a href="#${esc(d.id)}">${esc(d.title)}</a></td><td>${esc(d.why)}</td><td>${link(d.source)}</td></tr>`).join("")}</table>` : `<p class="muted">None in this run.</p>`}
 ${surprises.length ? `<h2 class="bad">Needs attention</h2><table>${surprises.map((s) => `<tr><td><a href="#${esc(s.id)}">${esc(s.id)}</a></td><td>${esc(s.verdict)}</td><td>${esc(s.labError ?? s.checks.filter((c) => !c.pass).map((c) => c.name).join("; "))}</td></tr>`).join("")}</table>` : ""}
 
+<h2>Compatibility matrix</h2>
+<p class="muted">Every client and configuration the lab knows about, and how it was covered. Automated rows ran in this report; static rows check schemas against a client's documented rules; nothing is marked tested unless it ran.</p>
+<div class="wrap"><table><tr><th>Client</th><th>Version</th><th>Transport</th><th>Auth</th><th>Server</th><th>Coverage</th><th>Result</th></tr>
+${run.matrix.map((m) => `<tr><td>${esc(m.client)}</td><td>${esc(m.version)}</td><td>${esc(m.transport)}</td><td>${esc(m.auth)}</td><td>${esc(m.server)}</td><td class="${m.coverage === "not run" ? "muted" : ""}">${esc(m.coverage)}</td><td>${esc(m.result)}</td></tr>`).join("")}
+</table></div>
+
 <h2>What the agent saw</h2>
 <p class="muted">Each row is one failure we caused on purpose. The diagnosis columns show what the lab concluded from the agent's text alone, and from the agent's text plus Exa's request log.</p>
 <div class="wrap"><table><tr><th>Scenario</th><th>Caused at</th><th>Exa's log</th><th>Agent saw</th><th>Error?</th><th>Agent view</th><th>Full</th></tr>

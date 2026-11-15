@@ -5,6 +5,7 @@ import { evaluate, reproducibility, type Evaluation } from "./evaluate.js";
 import { startFakeExa } from "./fake-exa/server.js";
 import { runScenario, type ScenarioResult } from "./run.js";
 import type { Scenario } from "./scenario.js";
+import { buildMatrix, type MatrixRow } from "./matrix.js";
 import { checkSchemas, compareTools, type Drift, type SchemaFinding } from "./schemas.js";
 import { startLocal } from "./targets.js";
 
@@ -34,6 +35,7 @@ export interface LabRun {
   schemas: SchemaFinding[];
   drift?: Drift;
   manual: ManualResult[];
+  matrix: MatrixRow[];
 }
 
 export interface LabOptions {
@@ -82,6 +84,7 @@ export async function runLab(all: Scenario[], o: LabOptions, root: string): Prom
     const keyless = await listLocalKeyless();
     drift = compareTools(keyless, { version: hosted.server?.version, tools: hosted.tools });
   }
+  const manual = readManual(root);
 
   return {
     meta: {
@@ -96,7 +99,8 @@ export async function runLab(all: Scenario[], o: LabOptions, root: string): Prom
     evaluation,
     schemas,
     ...(drift && { drift }),
-    manual: readManual(root),
+    manual,
+    matrix: buildMatrix(results, schemas, manual),
   };
 }
 
