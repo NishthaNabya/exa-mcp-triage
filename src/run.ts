@@ -121,8 +121,6 @@ export function verdictFor(label: Label, checks: CheckResult[]): Verdict {
       return allPass ? "as-expected" : "unexpected";
     case "external-not-reproduced":
       return allPass ? "not-reproduced" : "reproduced";
-    case "manual":
-      return "as-expected";
   }
 }
 

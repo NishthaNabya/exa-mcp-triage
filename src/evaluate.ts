@@ -6,7 +6,7 @@ import { LAYERS, type Diagnosis, type LayerOrNone } from "./types.js";
 
 export interface EvalItem {
   id: string;
-  set: "generated" | "real" | "variant" | "variant-2";
+  set: "generated" | "real" | "variant" | "variant-2" | "variant-3";
   mode: "agent-view" | "full";
   expected: LayerOrNone;
   predicted: LayerOrNone;
@@ -57,6 +57,7 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
     ["real", "agent-view"],
     ["variant", "agent-view"],
     ["variant-2", "agent-view"],
+    ["variant-3", "agent-view"],
   ] as const;
   const scores = groups.map(([set, mode]) => ({ set, mode, score: score(items.filter((i) => i.set === set && i.mode === mode)) }));
   return { items, scores, unscored };

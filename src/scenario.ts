@@ -26,5 +26,3 @@ export interface Scenario {
   timeoutMs?: number; // client timeout for the call; default 15s
   slow?: boolean; // takes a minute or more; runs only with --slow
 }
-
-export const defineScenarios = (list: Scenario[]) => list;

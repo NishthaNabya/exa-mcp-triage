@@ -18,8 +18,8 @@ export type Label =
   | "reproduced-defect" // ran against the pinned code and saw the bug
   | "regression" // passes today and should keep passing
   | "simulated" // condition created with the fake API, shows how the server reacts
-  | "external-not-reproduced" // public report we could not reproduce
-  | "manual"; // a person ran it in a client we cannot automate
+  | "external-not-reproduced"; // public report we could not reproduce
+// Manual client checks are recorded separately, in manual/results.json.
 
 /** What the agent ended up with after one MCP call. */
 export interface Observation {

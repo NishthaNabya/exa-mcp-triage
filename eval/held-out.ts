@@ -7,12 +7,14 @@
 //   so this set is not blind. Each rule cites a source instead of a case.
 // variant: written after the round-1 rules were frozen and scored blind once (12/14).
 //   Round 2 fixed rule bugs after seeing those results, so later scores are not blind.
-// variant-2: written after the round-2 fixes, scored once; rules not changed after.
+// variant-2: written after the round-2 fixes and scored blind once (10/12); round 3 then
+//   fixed the two gaps it showed, so later scores are not blind.
+// variant-3: written after the round-3 fixes, scored once; rules not changed after.
 import type { LayerOrNone, Observation } from "../src/types.js";
 
 export interface HeldOutCase {
   id: string;
-  set: "real" | "variant" | "variant-2";
+  set: "real" | "variant" | "variant-2" | "variant-3";
   source: string;
   text: string;
   outcome: Observation["outcome"];
@@ -139,4 +141,14 @@ export const heldOut: HeldOutCase[] = [
   { id: "v2-cf-522", set: "variant-2", source: "variant", text: "web_fetch_exa error (522): Request failed with status 522. Response body was not valid JSON: <!DOCTYPE html><title>api.exa.ai | 522: Connection timed out</title> Cloudflare", outcome: "tool-error", isError: true, expected: "edge", why: "Cloudflare could not reach the origin." },
   { id: "v2-connector-unreachable", set: "variant-2", source: "variant", text: "Tool 'exa__web_search_exa' failed: The connector's server could not be reached.", outcome: "tool-error", isError: true, expected: "client", why: "A client connector's own wording." },
   { id: "v2-lite-unsupported", set: "variant-2", source: "exa-mcp-server@93c0d5e src/tools/webSearchAdvanced.ts", text: "web_search_advanced_exa error: search type 'lite' does not support maxAgeHours. Remove it, or set type to 'auto'.", outcome: "tool-error", isError: true, expected: "protocol", why: "The server rejected an argument combination, which is invalid input." },
+
+  // ---- variant-3: written after the round-3 fixes, before scoring; rules not changed after ----
+  { id: "v3-404", set: "variant-3", source: "variant", text: "web_search_exa error (404): Not found\nTimestamp: 2026-11-15T13:00:00.000Z", outcome: "tool-error", isError: true, expected: "exa-api", why: "Exa-format 404." },
+  { id: "v3-nginx-413", set: "variant-3", source: "variant", text: "web_fetch_exa error (413): Request failed with status 413. Response body was not valid JSON: <html><head><title>413 Request Entity Too Large</title></head><body><center>nginx</center></body></html>", outcome: "tool-error", isError: true, expected: "edge", why: "A proxy refused a large request body." },
+  { id: "v3-input-validation", set: "variant-3", source: "variant", text: "MCP error -32602: Input validation error: Invalid arguments for tool web_search_exa: expected string, received undefined at query", outcome: "tool-error", isError: true, expected: "protocol", why: "Schema validation before the tool ran." },
+  { id: "v3-etimedout", set: "variant-3", source: "variant", text: "web_search_exa error: connect ETIMEDOUT 104.18.0.1:443", outcome: "tool-error", isError: true, expected: "network", why: "TCP connect timed out." },
+  { id: "v3-hosted-429", set: "variant-3", source: "variant", text: "Streamable HTTP error: Error POSTing to endpoint (HTTP 429): {\"error\":\"Too many requests\"}", outcome: "transport-error", isError: true, expected: "exa-api", why: "The hosted server rate-limited the connection itself." },
+  { id: "v3-server-exited", set: "variant-3", source: "variant", text: "MCP server exa exited with code 1", outcome: "transport-error", isError: true, expected: "mcp-server", why: "The server process crashed." },
+  { id: "v3-no-results", set: "variant-3", source: "variant", text: "No search results found. Please try a different query.", outcome: "success", isError: false, expected: "none", why: "Exa answered with nothing." },
+  { id: "v3-401", set: "variant-3", source: "variant", text: "web_fetch_exa error (401): Invalid API key provided\nTimestamp: 2026-11-15T13:00:00.000Z", outcome: "tool-error", isError: true, expected: "auth", why: "Exa-format 401." },
 ];

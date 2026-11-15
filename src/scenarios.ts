@@ -17,7 +17,7 @@ import {
   upstreamCount,
   upstreamHeader,
 } from "./checks.js";
-import { defineScenarios } from "./scenario.js";
+import type { Scenario } from "./scenario.js";
 import { HOSTED_URL } from "./targets.js";
 
 const ISSUE = (n: number, repo = "exa-mcp-server") => `https://github.com/exa-labs/${repo}/issues/${n}`;
@@ -31,7 +31,7 @@ const call = (tool: string, args: Record<string, unknown>) => ({ type: "call" as
 const ADVANCED = { ENABLED_TOOLS: "web_search_advanced_exa" };
 const contents = (body: Record<string, unknown>) => (body.contents ?? {}) as Record<string, unknown>;
 
-export const scenarios = defineScenarios([
+export const scenarios: Scenario[] = [
   // ---- protocol: MCP itself ----
   {
     id: "server-identity",
@@ -483,4 +483,4 @@ export const scenarios = defineScenarios([
     timeoutMs: 30_000,
     checks: [isError(false)],
   },
-]);
+];

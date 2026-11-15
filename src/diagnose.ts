@@ -20,6 +20,7 @@ const LEGACY_STATUS = /Request failed with status code (\d{3})/; // older Exa MC
 const HTML_PAGE = /<!DOCTYPE html|<html[\s>]|cloudflare|Ray ID|cf-ray/i;
 const NO_RESPONSE = /fetch failed|ECONNREFUSED|ENOTFOUND|ECONNRESET|EAI_AGAIN|getaddrinfo|socket hang up/i;
 const SERVER_TIMEOUT = /timed out after (\d+)s/; // withTimeout() in errorHandler.ts
+const SERVER_REJECTED_INPUT = /does not support|is not supported|Remove (it|them)\b/;
 const SERVER_TOOL_LIMIT_MS = 60_000; // API_CONFIG.TOOL_TIMEOUTS.SEARCH_MS and FETCH_MS in src/tools/config.ts
 
 const NEXT: Record<Layer, string> = {
@@ -107,11 +108,16 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
   if (EXA_PLAIN_ERROR.test(text)) {
     if (NO_RESPONSE.test(text)) return d("network", "certain", "no-response", [quote(text)], "No HTTP response came back from Exa's API.");
     if (SERVER_TIMEOUT.test(text)) return d("network", "likely", "server-timeout", [quote(text)], "Exa's server stopped waiting for Exa's API.");
+    // The tools' own input checks end like this (src/tools/webSearchAdvanced.ts).
+    if (SERVER_REJECTED_INPUT.test(text)) return d("protocol", "certain", "server-rejected-input", [quote(text)], "The server refused an argument combination before calling Exa.");
     return d("mcp-server", "likely", "server-exception", [quote(text)], "An exception inside Exa's MCP server, not an API error.");
   }
 
-  // Not a format Exa's server produces. A 403 here is the edge: Exa's hosted server asks
-  // for login with 401, not 403 (probed live, 2026-11-15).
+  // Not a format Exa's server produces. Exa's hosted server asks for login with 401
+  // and never answers 403 itself (probed live, 2026-11-15), so a 401 is auth and a 403 is the edge.
+  if (/\b401\b|Authentication required/.test(text)) {
+    return d("auth", "likely", "connect-401", [quote(text)], "The server asked for a key or login before any tool ran.");
+  }
   if (/\b403\b/.test(text)) {
     return d("edge", "likely", "connect-403", [quote(text)], "Exa asks for auth with 401, so a 403 before any MCP response points to the edge.");
   }
