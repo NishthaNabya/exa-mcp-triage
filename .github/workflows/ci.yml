@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm test
+      # Offline run: no key and no network after setup. Fails only on regressions,
+      # unexpected results or lab errors; reproduced defects are expected findings.
+      - run: npm run lab
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-node-${{ matrix.node }}
+          path: |
+            report/index.html
+            runs/*.json

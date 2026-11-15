@@ -78,7 +78,7 @@ npm run lab
 | `--list` | list all scenarios |
 | `--serve id` | start one scenario's fake API, for a manual test in a real client |
 
-Run the lab's own tests with `npm test`.
+Run the lab's own tests with `npm test`. `.github/workflows/ci.yml` runs setup, typecheck, tests and an offline lab run on Node 20 and 22. It has not run yet, because the repo has not been pushed.
 
 ## How every result is labeled
 
@@ -98,14 +98,27 @@ Numbers from the full run (`npm run lab -- --live --slow`). Full history in [doc
 | Set | What it is | Agent view | Full |
 |---|---|---|---|
 | generated | the lab's own scenarios; the answer is known because we caused the failure | 28/32 | 32/32 |
-| real | error text from 5 public reports with a confirmed cause, plus the Nov 9 case | 5/5 | |
-| variant-3 | 8 cases written after the last rule change and scored once | 5/8 | |
+| real | error text from public reports with a confirmed cause, plus the Nov 9 case | 5/5 | |
+| variant-4 | 11 cases written after the last rule change and scored once | 10/11 | |
 
-Only variant-3 is a blind score. The real cases were read before the rules were written, and the earlier variant batches were used to fix rules, so treat those numbers as optimistic. The 4 generated misses are known limits: agent view cannot see #470 (the agent gets a normal result), and a client timeout shorter than the server's hides the real cause.
+Only variant-4 is a blind score. The real cases were read before the rules were written, and each earlier variant batch was scored blind once and then used to fix rules, so treat those numbers as optimistic. The blind scores went 12/14, 10/12, 5/8, then 10/11 as the rules improved; [docs/ROUNDS.md](docs/ROUNDS.md) has each round.
 
-The variant-3 misses show the weakest rule: text in no known format falls back to client. That was right for the Nov 9 case, but it also caught `connect ETIMEDOUT`, a hosted HTTP 429 and a crashed server process. The next fix is to add those patterns and send unknown text to unknown, not client, then score a new blind batch.
+When the text matches no known format, the diagnosis says unknown instead of guessing, and the report counts that separately from a wrong layer. A wrong layer sends support the wrong way; unknown sends them to collect more evidence.
+
+Known misses:
+- Agent view cannot see #470, because the agent gets a normal result. Full mode catches it.
+- When the client's timeout is shorter than the server's 60s, agent view can only blame the client; the real cause is hidden.
+- The one blind miss: Node's "The operation was aborted due to timeout" is read as a server exception, not a network timeout. That is the next rule to add, with a new blind batch after it.
 
 ![Evaluation](docs/images/report-evaluation.jpg)
+
+## Compatibility matrix
+
+Every client and configuration the lab knows about, with how it was covered. Automated rows ran in the report; static rows check the tool schemas against a client's documented rules (Ajv strict mode, OpenAI strict mode); manual rows need a person. Nothing is marked tested unless it ran.
+
+![Compatibility matrix](docs/images/report-matrix.jpg)
+
+OpenAI strict mode requires every field to be required. Exa's tools use optional fields, which is a normal design choice, so a client that turns on strict mode has to convert the schemas first. That is a compatibility note, not a bug.
 
 ## Manual client checks
 
@@ -122,6 +135,7 @@ src/checks.ts   pass or fail checks over an observation
 src/diagnose.ts layer diagnosis, agent view and full
 src/evaluate.ts scoring and reproducibility
 src/schemas.ts  strict schema checks and drift against production
+src/matrix.ts   the compatibility matrix
 src/report.ts   the HTML report
 eval/           held-out cases, kept apart from the rules
 manual/         manual client checks
@@ -138,3 +152,4 @@ docs/           scope, PRD, build rounds, demo
 - The fake API's log stands in for Exa's own logs. Full mode assumes support can see whether a request reached Exa's app, as Exa's own edge and app logs would show.
 - Simulated scenarios show how the server reacts to a condition, not how often that condition happens.
 - No client other than this lab's MCP SDK client is tested automatically.
+- Running the lab spends no Exa credits: the pinned server only talks to the fake API, and live checks use the keyless tier. Checked against the account's request log on 2026-11-15: no request from the lab or from Claude Code.

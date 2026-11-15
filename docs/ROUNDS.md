@@ -97,3 +97,31 @@ Fresh clone: `git clone`, `npm ci`, `npm run setup`, `npm test`, `npm run lab` i
 The blind variant-3 misses all hit the same weak rule: text in no known format falls back to client. It was right for the Nov 9 case, but it also caught `connect ETIMEDOUT` (network), a hosted HTTP 429 outside a tool result (exa-api) and "exited with code 1" (mcp-server). Rules were not changed after this score, so 5/8 stands as the current blind number.
 
 Next, if this continues: add those three patterns with sources, send unrecognized text to "unknown" instead of client, and score a new blind batch.
+
+## Round 4: say unknown instead of guessing
+
+Changes, each traced to a source:
+- Text in no known format now gets "unknown", not client. Round 3's blind batch showed the client guess was wrong 3 times out of 3.
+- Text that mentions a "connector" is client. Claude and ChatGPT call remote MCP servers connectors, and Exa's server never sends the word (it appears only in source comments). This keeps the Nov 9 case and #61 right without the old fallback.
+- Node's system error codes for no response (ETIMEDOUT, EHOSTUNREACH, ENETUNREACH, EPIPE) count as network; "Cannot find module" counts as a server that never started; "exited with code" and kill signals count as a server process that died.
+- The scores now report wrong layers and unknowns separately.
+- An explicit compatibility matrix: every client and configuration, with automated, static, manual or not-run coverage.
+- A CI workflow (Node 20 and 22). It has not run yet because the repo is not pushed.
+
+A new blind batch, variant-4 (11 cases), was written after these changes and scored once.
+
+| Set | Evidence | Round 3 | Round 4 |
+|---|---|---|---|
+| generated | agent view | 28/32 | 28/32 |
+| generated | full | 32/32 | 32/32 |
+| real | agent view | 5/5 | 5/5 (not blind) |
+| variant | agent view | 13/14 | 13/14, 1 unknown (not blind) |
+| variant-2 | agent view | 12/12 | 12/12 (not blind) |
+| variant-3 | agent view | 5/8 (blind) | 7/8, 1 unknown (not blind) |
+| variant-4 | agent view | n/a | 10/11 (blind) |
+
+The two remaining unknowns used to be wrong answers (an Envoy proxy reset and a hosted HTTP 429 outside a tool result). The one blind variant-4 miss: "The operation was aborted due to timeout", Node's message when fetch gives up, was read as a server exception instead of network. Rules were not changed after this score.
+
+Credits check, 2026-11-15: the account's request log for the last 24 hours had 79 requests, all from claude.ai and ChatGPT sessions, none from Claude Code or the lab.
+
+Full run: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs. Tests: 51 passing.
