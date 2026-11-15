@@ -39,9 +39,37 @@ The variant score is the only blind one: the rules were written before the varia
 - Agent view cannot see #470: the agent gets a normal result. Only Exa's log shows the 0.
 - When the client's timeout is shorter than the server's 60s limit, agent view can only blame the client; the real cause is hidden. This is the right answer for what an agent sees, and it counts as a miss against the injected cause.
 
-### Findings from the live run
+### Findings from the live run (round 1)
 
 - Production reports version 3.5.1. The latest public commit and npm release are 3.4.3.
 - Production's `web_search_exa` lists a new required `objective` argument that 3.4.3 does not have. A keyless call without `objective` still succeeded.
 - `?login` answers 401 with a `WWW-Authenticate` header pointing to the OAuth metadata; plain `/mcp` answers 200 on the anonymous tier. This is the fix for #378, and it holds.
 - #475 not reproduced: when Exa's API hangs, the server returns its own timeout error at 60s (measured 62s), well before a 300s client limit.
+
+## Round 2: correctness and honesty review
+
+Review questions from the PRD, and what they found beyond the five round-1 faults:
+
+6. A setup failure could pass as a finding. If the server was not built, a call scenario recorded "server failed to start" as an observation and diagnosed it. Now a failed start is an observation only in scenarios that break the start on purpose (`spawn` set); anywhere else it is a lab error.
+7. Some checks could pass without testing anything. The #470 highlight check passed if highlights were missing entirely, and "warning not shown" passed on an empty error. Both now also check that the expected content is there.
+8. Drift said a schema changed but not how. It now lists argument-level changes.
+
+Fixes for faults 1 to 3: connection-level errors now fall through to the edge and client rules unless they show no response; only JSON-RPC -326xx codes count as protocol; the lab keeps the client's underlying start error (for example `spawn ... ENOENT`), as a real client log would; coercion detection follows the server's prefix renaming (`highlightsMaxCharacters` to `highlights.maxCharacters`).
+
+A new blind batch, variant-2 (12 cases), was written after these fixes and scored once.
+
+Full run, 2026-11-15: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs.
+
+| Set | Evidence | Round 1 | Round 2 |
+|---|---|---|---|
+| generated | agent view | 26/32 | 28/32 |
+| generated | full | 29/32 | 32/32 |
+| real | agent view | 2/5 | 5/5 (not blind) |
+| variant | agent view | 12/14 (blind) | 13/14 (not blind) |
+| variant-2 | agent view | n/a | 10/12 (blind) |
+
+Remaining generated misses are the two known limits from round 1. The blind variant-2 misses are real gaps:
+- The hosted server's own 401 body ("Authentication required. Use OAuth or provide an API key.") outside a tool result was called client, not auth.
+- A tool rejecting an argument combination ("search type 'lite' does not support maxAgeHours") was called a server exception, not invalid input.
+
+Live drift now reads: `web_search_exa` added `objective (required)` in production 3.5.1.

@@ -129,9 +129,9 @@ export const scenarios = defineScenarios([
     upstream: { "/search": ok(B.searchOk()) },
     action: call("web_search_advanced_exa", { query: "test query", enableHighlights: true, highlightsMaxCharacters: null, highlightsNumSentences: null }),
     checks: [
-      upstreamBody("/search", "highlight limits are not sent as 0", (b) => {
-        const h = (contents(b).highlights ?? {}) as Record<string, unknown>;
-        return h.maxCharacters !== 0 && h.numSentences !== 0;
+      upstreamBody("/search", "highlights are requested, without limits of 0", (b) => {
+        const h = contents(b).highlights as Record<string, unknown> | undefined;
+        return h !== undefined && h.maxCharacters !== 0 && h.numSentences !== 0;
       }),
     ],
   },
@@ -213,7 +213,7 @@ export const scenarios = defineScenarios([
     target: "local",
     upstream: { "/search": ok(B.searchOk({ warnings: [{ code: "IGNORED_FIELD", path: "/startCrawlDate", message: "startCrawlDate is ignored" }] })) },
     action: call(search.tool, search.args),
-    checks: [textExcludes("IGNORED_FIELD", "agent does not see the warning"), serverLogIncludes("IGNORED_FIELD", "server log records the warning")],
+    checks: [isError(false), textIncludes("Example page 1", "agent gets the results"), textExcludes("IGNORED_FIELD", "agent does not see the warning"), serverLogIncludes("IGNORED_FIELD", "server log records the warning")],
   },
   {
     id: "notices-shown",
@@ -225,7 +225,7 @@ export const scenarios = defineScenarios([
     target: "local",
     upstream: { "/search": ok(B.searchOk({ notices: [{ code: "RESTRICTIONS_RELAXED", path: "/query", message: "Relaxed the site: restriction to return results." }] })) },
     action: call(search.tool, search.args),
-    checks: [textIncludes("Note: Relaxed the site: restriction to return results.")],
+    checks: [isError(false), textMatches(/^Note: Relaxed the site: restriction to return results\.\n\nTitle:/, "notice leads the text, before the results")],
   },
 
   // ---- auth ----
@@ -474,7 +474,7 @@ export const scenarios = defineScenarios([
   {
     id: "hosted-keyless-search",
     title: "One real keyless search succeeds",
-    why: "Confirms the live path works end to end. Uses Exa's free keyless tier, not the user's credits.",
+    why: "Confirms the live path works end to end, on Exa's free keyless tier. It sends no `objective`, which production's schema marks as required, to see whether the server enforces it.",
     label: "regression",
     layer: "none",
     source: HOSTED_URL,

@@ -47,7 +47,16 @@ export async function startLocal(opts: { apiBaseUrl: string; env?: Record<string
   transport.stderr?.on("data", (chunk: Buffer) => serverLog.push(...chunk.toString("utf8").split(/\r?\n/).filter(Boolean)));
 
   const client = new Client(clientInfo);
-  await client.connect(transport);
+  // A real client logs why a server failed to start (for example "spawn npx ENOENT").
+  // The SDK only says "Connection closed", so keep the underlying errors and add them.
+  const transportErrors: string[] = [];
+  client.onerror = (e) => transportErrors.push(e.message);
+  try {
+    await client.connect(transport);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new Error([msg, ...new Set(transportErrors)].join(" | "));
+  }
   return { client, server: client.getServerVersion() ?? {}, serverLog, close: () => client.close() };
 }
 

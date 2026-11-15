@@ -35,6 +35,18 @@ describe("agent-view diagnosis, one case per rule", () => {
     expect(dx.layer).toBe("client");
   });
 
+  it("does not call a closed connection a protocol error", () => {
+    const closed = diagnoseAgentView(ev("MCP error -32000: Connection closed", { outcome: "transport-error" }));
+    const notStarted = diagnoseAgentView(ev("MCP error -32000: Connection closed | spawn npx ENOENT", { outcome: "transport-error" }));
+    expect(closed.layer).toBe("mcp-server");
+    expect(notStarted.layer).toBe("client");
+  });
+
+  it("lets connection-level errors reach the edge and client rules", () => {
+    expect(diagnoseAgentView(ev("Version negotiation failed: the server denied access (HTTP 403)", { outcome: "transport-error" })).layer).toBe("edge");
+    expect(diagnoseAgentView(ev("HTTP 400 {\"detail\":\"Connector is not safe\"}", { outcome: "transport-error" })).layer).toBe("client");
+  });
+
   it("keeps observed facts and inference apart", () => {
     const dx = diagnoseAgentView(ev("web_search_exa error: fetch failed"));
     expect(dx.facts.join(" ")).toContain("fetch failed");
@@ -52,6 +64,16 @@ describe("full diagnosis", () => {
     });
     expect(dx.layer).toBe("mcp-server");
     expect(dx.confidence).toBe("certain");
+  });
+
+  it("follows renamed arguments into nested fields (#470, highlights)", () => {
+    const dx = diagnoseFull({
+      tool: "web_search_advanced_exa",
+      args: { query: "q", enableHighlights: true, highlightsMaxCharacters: null },
+      agent: obs("ok", { outcome: "success", isError: false }),
+      upstream: [{ method: "POST", path: "/search", headers: {}, body: { contents: { highlights: { maxCharacters: 0 } } }, reachedApp: true, status: 200 }],
+    });
+    expect(dx.layer).toBe("mcp-server");
   });
 
   it("says edge when requests left the server but none reached Exa's app", () => {

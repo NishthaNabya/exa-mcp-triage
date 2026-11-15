@@ -5,13 +5,14 @@
 //   never confirmed, so the case is diagnosed in the report but not scored.
 //   Caveat: these texts were read before the rules in src/diagnose.ts were written,
 //   so this set is not blind. Each rule cites a source instead of a case.
-// variant: written after the rules were frozen, to test cases the rules never saw.
-//   The rules were not changed after scoring these.
+// variant: written after the round-1 rules were frozen and scored blind once (12/14).
+//   Round 2 fixed rule bugs after seeing those results, so later scores are not blind.
+// variant-2: written after the round-2 fixes, scored once; rules not changed after.
 import type { LayerOrNone, Observation } from "../src/types.js";
 
 export interface HeldOutCase {
   id: string;
-  set: "real" | "variant";
+  set: "real" | "variant" | "variant-2";
   source: string;
   text: string;
   outcome: Observation["outcome"];
@@ -124,4 +125,18 @@ export const heldOut: HeldOutCase[] = [
   { id: "v-envoy-reset", set: "variant", source: "variant", text: "upstream connect error or disconnect/reset before headers. reset reason: connection termination", outcome: "transport-error", isError: true, expected: "edge", why: "An Envoy proxy message from a gateway between client and server." },
   { id: "v-cf-challenge", set: "variant", source: "variant", text: "Streamable HTTP error: Error POSTing to endpoint (HTTP 403): <!DOCTYPE html><html><head><title>Just a moment...</title>", outcome: "transport-error", isError: true, expected: "edge", why: "A Cloudflare browser challenge page." },
   { id: "v-ok", set: "variant", source: "variant", text: "Title: Result\nURL: https://example.com\nPublished: N/A\nAuthor: N/A", outcome: "success", isError: false, expected: "none", why: "A normal result." },
+
+  // ---- variant-2: written after the round-2 fixes, before scoring; rules not changed after ----
+  { id: "v2-429-wording", set: "variant-2", source: "variant", text: "web_search_exa error (429): Too many requests, slow down\nTimestamp: 2026-11-15T12:00:00.000Z", outcome: "tool-error", isError: true, expected: "exa-api", why: "Exa-format 429 with other wording." },
+  { id: "v2-econnreset", set: "variant-2", source: "variant", text: "web_fetch_exa error: read ECONNRESET", outcome: "tool-error", isError: true, expected: "network", why: "Connection reset mid-request." },
+  { id: "v2-nginx-403", set: "variant-2", source: "variant", text: "web_search_exa error (403): Request failed with status 403. Response body was not valid JSON: <html><head><title>403 Forbidden</title></head><body><center><h1>403 Forbidden</h1></center></body></html>", outcome: "tool-error", isError: true, expected: "edge", why: "A proxy's own 403 page." },
+  { id: "v2-method-not-found", set: "variant-2", source: "variant", text: "MCP error -32601: Method not found", outcome: "mcp-error", isError: true, expected: "protocol", why: "Client calls a method the server does not support." },
+  { id: "v2-wrong-path", set: "variant-2", source: "variant", text: "Error: Cannot find module '/usr/lib/node_modules/exa-mcp-server/dist/stdio.cjs'", outcome: "transport-error", isError: true, expected: "client", why: "Client config points at a path that does not exist." },
+  { id: "v2-400", set: "variant-2", source: "variant", text: "web_search_exa error (400): Invalid request body: numResults must be at most 100\nTimestamp: 2026-11-15T12:00:00.000Z", outcome: "tool-error", isError: true, expected: "exa-api", why: "Exa rejected the request body." },
+  { id: "v2-hosted-auth-required", set: "variant-2", source: "Hosted server's own 401 body, probed 2026-11-15", text: "Error POSTing to endpoint (HTTP 401): {\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32000,\"message\":\"Authentication required. Use OAuth or provide an API key.\"},\"id\":null}", outcome: "transport-error", isError: true, expected: "auth", why: "The hosted server asking for login." },
+  { id: "v2-401-plain", set: "variant-2", source: "variant", text: "web_search_exa error (401): Unauthorized\nTimestamp: 2026-11-15T12:00:00.000Z", outcome: "tool-error", isError: true, expected: "auth", why: "Exa-format 401." },
+  { id: "v2-notice-ok", set: "variant-2", source: "variant", text: "Note: Relaxed the site: restriction to return results.\n\nTitle: A\nURL: https://a.example", outcome: "success", isError: false, expected: "none", why: "A normal result with a notice." },
+  { id: "v2-cf-522", set: "variant-2", source: "variant", text: "web_fetch_exa error (522): Request failed with status 522. Response body was not valid JSON: <!DOCTYPE html><title>api.exa.ai | 522: Connection timed out</title> Cloudflare", outcome: "tool-error", isError: true, expected: "edge", why: "Cloudflare could not reach the origin." },
+  { id: "v2-connector-unreachable", set: "variant-2", source: "variant", text: "Tool 'exa__web_search_exa' failed: The connector's server could not be reached.", outcome: "tool-error", isError: true, expected: "client", why: "A client connector's own wording." },
+  { id: "v2-lite-unsupported", set: "variant-2", source: "exa-mcp-server@93c0d5e src/tools/webSearchAdvanced.ts", text: "web_search_advanced_exa error: search type 'lite' does not support maxAgeHours. Remove it, or set type to 'auto'.", outcome: "tool-error", isError: true, expected: "protocol", why: "The server rejected an argument combination, which is invalid input." },
 ];

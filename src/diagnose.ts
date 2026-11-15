@@ -75,13 +75,16 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
     return d("exa-api", "certain", "free-tier-rate-limit", [quote(text)], "Keyless MCP use hit the free tier's rate limit.");
   }
 
+  // JSON-RPC -326xx codes are MCP protocol errors (-32602 invalid params, -32601 method not found).
+  // -32000 is the SDK's "connection closed", which is transport and is handled below.
   const sdk = text.match(SDK_ERROR);
-  if (sdk) return d("protocol", sdk[1] === "-32602" ? "certain" : "likely", "mcp-sdk-error", [quote(text)]);
+  if (sdk?.[1]?.startsWith("-326")) return d("protocol", sdk[1] === "-32602" ? "certain" : "likely", "mcp-sdk-error", [quote(text)]);
 
   if (agent.outcome === "transport-error") {
     if (/ENOENT|EACCES|spawn/i.test(text)) return d("client", "likely", "server-not-started", [quote(text)], "The client could not start the server process.");
     if (/connection closed/i.test(text)) return d("mcp-server", "likely", "server-closed", [quote(text)], "The server process exited or closed the connection.");
-    return d("network", "likely", "transport-error", [quote(text)]);
+    if (NO_RESPONSE.test(text)) return d("network", "likely", "transport-no-response", [quote(text)]);
+    // Anything else falls through to the edge and client rules below.
   }
 
   if (EXA_ALL_URLS_FAILED.test(text)) return d("exa-api", "certain", "all-urls-failed", [quote(text)]);
@@ -157,6 +160,20 @@ function logFacts(log: UpstreamExchange[]): string[] {
   ];
 }
 
+// web_search_advanced_exa flattens nested options into prefixed arguments, e.g.
+// highlightsMaxCharacters -> contents.highlights.maxCharacters (src/tools/webSearchAdvanced.ts).
+const NESTED_PREFIXES = ["highlights", "text", "context", "summary"];
+
+/** Where an argument ends up in the request Exa receives: its own name, or its nested name. */
+function sentValue(body: unknown, arg: string): unknown {
+  const direct = findKey(body, arg);
+  if (direct !== undefined) return direct;
+  const prefix = NESTED_PREFIXES.find((p) => arg.startsWith(p) && arg.length > p.length);
+  if (!prefix) return undefined;
+  const rest = arg.slice(prefix.length);
+  return findKey(findKey(body, prefix), rest[0]!.toLowerCase() + rest.slice(1));
+}
+
 /** Arguments the agent sent as null or "" that reached Exa as 0. (The #470 pattern.) */
 function coercedArgs(args: unknown, log: UpstreamExchange[]): string[] {
   if (!args || typeof args !== "object") return [];
@@ -164,7 +181,7 @@ function coercedArgs(args: unknown, log: UpstreamExchange[]): string[] {
   const out: string[] = [];
   for (const key of blanks) {
     for (const x of log) {
-      if (findKey(x.body, key) === 0) out.push(`Agent sent ${key}: ${JSON.stringify((args as Record<string, unknown>)[key])}; Exa received ${key}: 0`);
+      if (sentValue(x.body, key) === 0) out.push(`Agent sent ${key}: ${JSON.stringify((args as Record<string, unknown>)[key])}; Exa received 0`);
     }
   }
   return [...new Set(out)];

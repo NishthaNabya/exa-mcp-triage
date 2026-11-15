@@ -63,7 +63,7 @@ ${calls.map((c) => `<tr><td><a href="#${esc(c.id)}">${esc(c.id)}</a></td><td>${e
 </table></div>
 
 <h2>How often the diagnosis is right</h2>
-<p class="muted"><b>generated</b>: the failures above, where we know the answer because we caused it. <b>real</b>: error text from public reports and one first-hand case; these were read before the rules were written, so treat that score as optimistic. <b>variant</b>: written after the rules were frozen; the rules were not changed after scoring them.</p>
+<p class="muted"><b>generated</b>: the failures above, where we know the answer because we caused it. <b>real</b>: error text from public reports and one first-hand case; these were read before the rules were written, so treat that score as optimistic. <b>variant</b>: written after the round-1 rules were frozen and scored blind in round 1 (12/14); the round-2 fixes were made after seeing them, so this score is no longer blind. <b>variant-2</b>: written after the round-2 fixes and scored once, blind. See docs/ROUNDS.md.</p>
 <table><tr><th>Set</th><th>Evidence</th><th>Correct</th><th>Accuracy</th><th>False positives</th><th>False negatives</th></tr>
 ${run.evaluation.scores.filter((s) => s.score.n).map((s) => `<tr><td>${esc(s.set)}</td><td>${esc(s.mode)}</td><td>${s.score.correct}/${s.score.n}</td><td>${pct(s.score.accuracy)}</td><td>${s.score.falsePositives}</td><td>${s.score.falseNegatives}</td></tr>`).join("")}
 </table>
@@ -125,7 +125,7 @@ function driftHtml(run: LabRun) {
   return `<h3>Pinned server vs hosted server (keyless tool sets)</h3>
 <table><tr><th>Pinned version</th><td>${esc(d.localVersion)}</td></tr><tr><th>Hosted version</th><td>${esc(d.hostedVersion)}</td></tr>
 <tr><th>Only in pinned</th><td>${esc(d.onlyLocal.join(", ") || "none")}</td></tr><tr><th>Only in hosted</th><td>${esc(d.onlyHosted.join(", ") || "none")}</td></tr>
-<tr><th>Same tool, different schema</th><td>${esc(d.changedSchemas.join(", ") || "none")}</td></tr></table>
+<tr><th>Same tool, different schema</th><td>${d.changedSchemas.length ? d.changedSchemas.map((c) => `<b>${esc(c.tool)}</b>: ${esc(c.changes.join("; "))}`).join("<br>") : "none"}</td></tr></table>
 <p class="muted">${same ? "No differences in tool names or schemas." : "Production differs from the pinned public code, so results above describe the public code; live scenarios describe production."}</p>`;
 }
 

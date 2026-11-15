@@ -60,8 +60,9 @@ export async function runScenario(s: Scenario): Promise<ScenarioResult> {
             : await startHosted();
         ctx.server = target.server;
       } catch (error) {
-        // A server that fails to start is an observation for scenarios that call a tool.
-        if (s.action.type !== "call") throw error;
+        // A failed start is the observation only in scenarios that break the start on purpose.
+        // Anywhere else it is a problem with the lab's setup, not a finding.
+        if (!s.spawn || s.action.type !== "call") throw error;
         ctx.obs = { outcome: "transport-error", isError: true, text: redactText(message(error)), durationMs: 0 };
       }
       if (target && s.action.type === "list-tools") {

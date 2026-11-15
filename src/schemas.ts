@@ -63,22 +63,40 @@ export interface Drift {
   hostedVersion?: string;
   onlyLocal: string[];
   onlyHosted: string[];
-  changedSchemas: string[];
+  changedSchemas: { tool: string; changes: string[] }[];
 }
 
+type Tool = { name: string; inputSchema: unknown };
+
 /** Differences between the pinned server and what Exa runs in production. */
-export function compareTools(
-  local: { version?: string; tools: { name: string; inputSchema: unknown }[] },
-  hosted: { version?: string; tools: { name: string; inputSchema: unknown }[] },
-): Drift {
-  const hash = (s: unknown) => createHash("sha256").update(JSON.stringify(s)).digest("hex").slice(0, 12);
-  const l = new Map(local.tools.map((t) => [t.name, hash(t.inputSchema)]));
-  const h = new Map(hosted.tools.map((t) => [t.name, hash(t.inputSchema)]));
+export function compareTools(local: { version?: string; tools: Tool[] }, hosted: { version?: string; tools: Tool[] }): Drift {
+  const hash = (s: unknown) => createHash("sha256").update(JSON.stringify(s)).digest("hex");
+  const l = new Map(local.tools.map((t) => [t.name, t.inputSchema]));
+  const h = new Map(hosted.tools.map((t) => [t.name, t.inputSchema]));
   return {
     ...(local.version && { localVersion: local.version }),
     ...(hosted.version && { hostedVersion: hosted.version }),
     onlyLocal: [...l.keys()].filter((n) => !h.has(n)),
     onlyHosted: [...h.keys()].filter((n) => !l.has(n)),
-    changedSchemas: [...l.keys()].filter((n) => h.has(n) && h.get(n) !== l.get(n)),
+    changedSchemas: [...l.keys()]
+      .filter((n) => h.has(n) && hash(h.get(n)) !== hash(l.get(n)))
+      .map((tool) => ({ tool, changes: describeChange(l.get(tool), h.get(tool)) })),
   };
+}
+
+/** Top-level argument changes, in words: added, removed, now required, no longer required. */
+function describeChange(before: unknown, after: unknown): string[] {
+  const props = (s: unknown) => (isObj(s) && isObj(s.properties) ? s.properties : {});
+  const req = (s: unknown) => new Set(isObj(s) && Array.isArray(s.required) ? (s.required as string[]) : []);
+  const [pb, pa, rb, ra] = [props(before), props(after), req(before), req(after)];
+  const out: string[] = [];
+  for (const k of Object.keys(pa)) if (!(k in pb)) out.push(`added ${k}${ra.has(k) ? " (required)" : ""}`);
+  for (const k of Object.keys(pb)) if (!(k in pa)) out.push(`removed ${k}`);
+  for (const k of Object.keys(pa)) {
+    if (!(k in pb)) continue;
+    if (ra.has(k) && !rb.has(k)) out.push(`${k} is now required`);
+    if (!ra.has(k) && rb.has(k)) out.push(`${k} is no longer required`);
+    if (JSON.stringify(pa[k]) !== JSON.stringify(pb[k])) out.push(`${k} definition changed`);
+  }
+  return out.length ? out : ["other schema change (descriptions or metadata)"];
 }
