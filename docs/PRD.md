@@ -48,13 +48,13 @@ R3. Hosted target. Connects to `https://mcp.exa.ai/mcp` over Streamable HTTP wit
 
 R4. Session checks. Initialize, record server name, version and protocol version, list tools, and handle timeouts and closed connections without crashing the run.
 
-R5. Scenarios. Each one has: id, title, layer under test, label (reproduced, regression, simulated, external, manual), target, upstream behavior, tool and arguments, checks, and timeout. Written in TypeScript so they are type-checked. Adding one means adding one object to a file.
+R5. Scenarios. Each one has: id, title, layer under test, label (reproduced, regression, simulated, external, manual), target, how the fake API fails, tool and arguments, checks, and timeout. Written in TypeScript so they are type-checked. Adding one means adding one object to a file.
 
 R6. Observation. One plain record per call: how the call ended (transport error, MCP error, tool error, success), the content the agent got, structured content and `_meta`, the requests the fake API received, server stderr lines, and timings.
 
-R7. Checks. Small functions over the observation that return pass or fail with a reason. For example: the result is marked as an error; the text contains the upstream request ID; the upstream request has no `maxAgeHours`; warnings are not shown to the model; notices are.
+R7. Checks. Small functions over the observation that return pass or fail with a reason. For example: the result is marked as an error; the text contains Exa's request ID; the request sent to Exa has no `maxAgeHours`; warnings are not shown to the model; notices are.
 
-R8. Diagnosis. Reads the evidence and returns: layer, confidence (certain, likely or unknown), the observed facts, the inference kept separate from the facts, and the next step. Works in two modes. Agent-view mode sees only what the agent saw, which is what a support engineer gets in a ticket. Full mode also sees server logs and upstream requests. Both are scored.
+R8. Diagnosis. Reads the evidence and returns: layer, confidence (certain, likely or unknown), the observed facts, the inference kept separate from the facts, and the next step. Works in two modes. Agent-view mode sees only what the agent saw, which is what a support engineer gets in a ticket. Instrumented mode (first called full mode) also reads the server log and the fake API's request log. Both are scored.
 
 R9. Evaluation. Scores the diagnosis on labeled cases:
 - Generated cases: every scenario has a known layer, because we caused the failure.
@@ -141,4 +141,4 @@ Round 3. Review for simplicity, then fix:
 
 - The pinned server builds on Windows. Its build script ends with `chmod`, which fails in Windows `cmd`, so setup runs the same esbuild command directly.
 - The hosted server still allows keyless calls at 3 per second, as Exa's February 2026 changelog says.
-- The upstream error format matches Exa's error-codes page: `requestId`, `error`, `tag`.
+- Exa's API error format matches Exa's error-codes page: `requestId`, `error`, `tag`.

@@ -21,7 +21,7 @@ describe("fake Exa API", () => {
     const res = await post("/search");
     expect(res.headers.get("cf-ray")).toBe("abc-EWR");
     expect(await res.text()).toContain("Cloudflare");
-    expect(fake.exchanges[0]?.reachedApp).toBe(false);
+    expect(fake.requests[0]?.reachedExaApp).toBe(false);
   });
 
   it("plays a sequence, repeating the last step", async () => {
@@ -36,8 +36,8 @@ describe("fake Exa API", () => {
   it("records request bodies and redacts the API key header", async () => {
     fake = await startFakeExa({ "/search": { kind: "ok", body: searchOk() } });
     await post("/search", { query: "q" }, { "x-api-key": "secret-value-123" });
-    expect(fake.exchanges[0]?.body).toEqual({ query: "q" });
-    expect(fake.exchanges[0]?.headers["x-api-key"]).toBe("[redacted]");
+    expect(fake.requests[0]?.body).toEqual({ query: "q" });
+    expect(fake.requests[0]?.headers["x-api-key"]).toBe("[redacted]");
   });
 
   it("releases hung requests on close", async () => {

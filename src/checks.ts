@@ -1,9 +1,9 @@
 // Small checks over what a scenario observed. Each returns pass or fail with a reason.
-import type { Observation, UpstreamExchange } from "./types.js";
+import type { Observation, ApiRequestRecord } from "./types.js";
 
 export interface CheckContext {
   obs?: Observation;
-  upstream: UpstreamExchange[];
+  apiRequests: ApiRequestRecord[];
   serverLog: string[];
   tools?: { name: string; inputSchema: unknown }[];
   server?: { name?: string; version?: string };
@@ -43,22 +43,22 @@ export const textExcludes = (needle: string, name = `agent text does not include
 export const textMatches = (re: RegExp, name: string) =>
   check(name, (ctx) => ({ pass: re.test(text(ctx)), detail: `text: ${short(text(ctx))}` }));
 
-export const upstreamCount = (path: string, n: number) =>
+export const apiRequestCount = (path: string, n: number) =>
   check(`Exa API received ${n} request(s) on ${path}`, (ctx) => {
-    const got = ctx.upstream.filter((x) => x.path === path).length;
+    const got = ctx.apiRequests.filter((x) => x.path === path).length;
     return { pass: got === n, detail: `received ${got}` };
   });
 
-export const upstreamBody = (path: string, name: string, test: (body: Record<string, unknown>) => boolean) =>
+export const apiRequestBody = (path: string, name: string, test: (body: Record<string, unknown>) => boolean) =>
   check(name, (ctx) => {
-    const x = ctx.upstream.find((u) => u.path === path);
+    const x = ctx.apiRequests.find((u) => u.path === path);
     const body = (x?.body ?? {}) as Record<string, unknown>;
     return { pass: x !== undefined && test(body), detail: x ? `body sent: ${short(JSON.stringify(body))}` : `no request on ${path}` };
   });
 
-export const upstreamHeader = (path: string, header: string, test: (value: string | undefined) => boolean, name: string) =>
+export const apiRequestHeader = (path: string, header: string, test: (value: string | undefined) => boolean, name: string) =>
   check(name, (ctx) => {
-    const value = ctx.upstream.find((u) => u.path === path)?.headers[header];
+    const value = ctx.apiRequests.find((u) => u.path === path)?.headers[header];
     return { pass: test(value), detail: `${header}: ${value ?? "(missing)"}` };
   });
 

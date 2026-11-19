@@ -1,158 +1,108 @@
-# Build rounds
+# Development history
 
-Each round ends with a full run. Faults found in the lab's own code are listed here with the fix, so the numbers can be traced.
+How the lab was built, what went wrong along the way, and how the scores moved. Problems found in the lab's own code are listed with their fix, so every number can be traced.
 
-## Round 1: build end to end
+## Where it stands now
 
-Full run: `npm run lab -- --live --slow --repeat 3`, 2026-11-15.
+- 36 scenarios (32 local, 4 against production). On every full run: 4 defects reproduced, 1 public report not reproduced, 0 regressions, 0 lab errors, and 31 of 31 fast scenarios give the same result on every repeat.
+- 61 tests of the lab itself, passing on Windows and in GitHub Actions on Ubuntu with Node 20 and 22.
+- Latest blind score: 20 of 22 from the agent's text alone.
+- Published at github.com/NishthaNabya/exa-mcp-triage since 2026-11-19 (first named exa-mcp-fault-lab).
 
-| Result | Count |
-|---|---|
-| Scenarios | 36 (32 local, 4 hosted) |
-| Pass or as expected | 31 |
-| Reproduced defects | 4 (#470 x3, dropped requestId) |
-| Not reproduced | 1 (#475) |
-| Regressed, unexpected, lab errors | 0 |
-| Reproducibility | 31/31 fast local scenarios identical across 3 runs |
+## Scores over time
 
-Diagnosis accuracy with round-1 rules:
+Two amounts of evidence: agent view (only the text the agent saw) and instrumented (also the stand-in API's request log and the server log; called "full" before round 5). "Blind" means scored once, before any rule was changed because of it. A blind batch stops being blind once it is used to fix rules, so its later numbers are shown for completeness only.
 
-| Set | Evidence | Correct |
-|---|---|---|
-| generated | agent view | 26/32 (81%) |
-| generated | full | 29/32 (91%) |
-| real | agent view | 2/5 (40%) |
-| variant (blind) | agent view | 12/14 (86%) |
+| Cases | Evidence | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|
+| generated | agent view | 26/32 | 28/32 | 28/32 | 28/32 | 28/32 |
+| generated | instrumented | 29/32 | 32/32 | 32/32 | 32/32 | 32/32 |
+| real | agent view | 2/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| variant | agent view | **12/14** | 13/14 | 13/14 | 13/14 | 13/14 |
+| variant-2 | agent view | | **10/12** | 12/12 | 12/12 | 12/12 |
+| variant-3 | agent view | | | **5/8** | 7/8 | 7/8 |
+| variant-4 | agent view | | | | **10/11** | 10/11 |
+| variant-5 | agent view | | | | | **20/22** |
 
-The variant score is the only blind one: the rules were written before the variants and were not changed before this score.
+Bold marks each batch's blind score. The real cases were read before the rules were written, so their score was never blind.
 
-### Faults found in the lab's own code
+## Round 1: build it end to end (2026-11-15)
 
-1. The transport-error branch in `diagnose.ts` caught every connection-level error and called it network, before the edge and client rules could run. This caused 3 of the 3 real misses (#100, #414, #61) and both variant misses.
-2. The rule for MCP SDK errors treated `-32000 Connection closed` as a protocol error. In the SDK, -32000 is a closed connection, which is transport. Worse, a missing server command and a crashing server give the same text, because the lab did not capture the spawn error that a real client logs.
-3. Full-mode coercion detection matched argument names literally. `web_search_advanced_exa` renames `highlightsMaxCharacters` to `highlights.maxCharacters`, so the highlight case of #470 was missed.
-4. Vitest picked up Exa's own test suite under `vendor/` (309 tests instead of 40). Fixed with `vitest.config.ts`.
-5. Earlier docs said the `ExaError` in the pinned server carries `requestId`. Reading the locked exa-js 2.16.0 showed it does not; `requestId` was added in exa-js 2.18.0. SCOPE.md was corrected before the code was written.
+What was built: the stand-in Exa API, Exa's MCP server pinned at commit `93c0d5e` and run locally, 36 scenarios, the two-mode diagnosis, scoring, schema and drift checks, the JSON and HTML reports, and tests for the lab itself.
 
-### Known limits, not faults
+Problems found in the lab's own code:
+1. Every connection-level error was called network before the edge and client rules could run. This caused all three real misses (#100, #414, #61) and both blind misses.
+2. `MCP error -32000: Connection closed` was treated as a protocol error. In the MCP SDK, -32000 is a closed connection. Worse, a missing server command and a crashing server gave the same text, because the lab did not keep the start error a real client logs.
+3. The changed-argument check matched names literally. `web_search_advanced_exa` renames `highlightsMaxCharacters` to `highlights.maxCharacters`, so one #470 case was missed.
+4. The test runner also picked up Exa's own test suite under `vendor/` (309 tests instead of 40).
+5. An early doc said the pinned server's error class carries the request ID. Reading the locked exa-js 2.16.0 showed it does not; exa-js added it in 2.18.0. Corrected before any code depended on it.
 
-- Agent view cannot see #470: the agent gets a normal result. Only Exa's log shows the 0.
-- When the client's timeout is shorter than the server's 60s limit, agent view can only blame the client; the real cause is hidden. This is the right answer for what an agent sees, and it counts as a miss against the injected cause.
+Findings from the first live run:
+- Production reports version 3.5.1; the latest public commit and npm release are 3.4.3.
+- Production's `web_search_exa` adds a required `objective` argument. A call without it still succeeded.
+- `?login` answers 401 with a login challenge pointing to the OAuth metadata; plain `/mcp` answers 200 on the free tier. The fix for #378 holds.
+- #475 not reproduced: when Exa's API hangs, the server reports its own timeout at 60 seconds (measured 62), well before a 300-second client limit.
 
-### Findings from the live run (round 1)
+## Round 2: correctness and honesty
 
-- Production reports version 3.5.1. The latest public commit and npm release are 3.4.3.
-- Production's `web_search_exa` lists a new required `objective` argument that 3.4.3 does not have. A keyless call without `objective` still succeeded.
-- `?login` answers 401 with a `WWW-Authenticate` header pointing to the OAuth metadata; plain `/mcp` answers 200 on the anonymous tier. This is the fix for #378, and it holds.
-- #475 not reproduced: when Exa's API hangs, the server returns its own timeout error at 60s (measured 62s), well before a 300s client limit.
+Problems found:
+1. A setup failure could pass as a finding: if the server was not built, a scenario recorded "server failed to start" and diagnosed it.
+2. Some checks could pass without testing anything, such as "warning not shown" on an empty error.
+3. Drift said a schema changed but not how.
 
-## Round 2: correctness and honesty review
+What changed: fixes for round 1's problems 1 to 3 and the three above. A failed start is now a finding only in scenarios that break the start on purpose. Checks also confirm the expected content is there. Drift lists argument-level changes. A new blind batch, variant-2, was written after the fixes.
 
-Review questions from the PRD, and what they found beyond the five round-1 faults:
+Result: real cases 5/5; blind variant-2 10/12. Its two misses were gaps: the production server's own 401 body was called client, and a tool rejecting an argument combination was called a server exception.
 
-6. A setup failure could pass as a finding. If the server was not built, a call scenario recorded "server failed to start" as an observation and diagnosed it. Now a failed start is an observation only in scenarios that break the start on purpose (`spawn` set); anywhere else it is a lab error.
-7. Some checks could pass without testing anything. The #470 highlight check passed if highlights were missing entirely, and "warning not shown" passed on an empty error. Both now also check that the expected content is there.
-8. Drift said a schema changed but not how. It now lists argument-level changes.
+## Round 3: simplicity and a clean clone
 
-Fixes for faults 1 to 3: connection-level errors now fall through to the edge and client rules unless they show no response; only JSON-RPC -326xx codes count as protocol; the lab keeps the client's underlying start error (for example `spawn ... ENOENT`), as a real client log would; coercion detection follows the server's prefix renaming (`highlightsMaxCharacters` to `highlights.maxCharacters`).
+What changed: the two variant-2 gaps were closed with rules traced to a source (the production 401, probed live; the tools' own input checks in `webSearchAdvanced.ts`). When an Exa error reaches the agent without a request ID, the diagnosis now points support at the timestamp instead. An identity wrapper and an unused label were removed. LICENSE added. A clone in a new folder, following only the README, gave the same results.
 
-A new blind batch, variant-2 (12 cases), was written after these fixes and scored once.
-
-Full run, 2026-11-15: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs.
-
-| Set | Evidence | Round 1 | Round 2 |
-|---|---|---|---|
-| generated | agent view | 26/32 | 28/32 |
-| generated | full | 29/32 | 32/32 |
-| real | agent view | 2/5 | 5/5 (not blind) |
-| variant | agent view | 12/14 (blind) | 13/14 (not blind) |
-| variant-2 | agent view | n/a | 10/12 (blind) |
-
-Remaining generated misses are the two known limits from round 1. The blind variant-2 misses are real gaps:
-- The hosted server's own 401 body ("Authentication required. Use OAuth or provide an API key.") outside a tool result was called client, not auth.
-- A tool rejecting an argument combination ("search type 'lite' does not support maxAgeHours") was called a server exception, not invalid input.
-
-Live drift now reads: `web_search_exa` added `objective (required)` in production 3.5.1.
-
-## Round 3: simplicity, a clean clone, and docs
-
-Changes:
-- Closed the two variant-2 gaps with rules traced to a source: a 401 outside a tool result is auth (the hosted server's own login challenge, probed live), and messages ending in "does not support ... Remove it" are the tools' own input checks (`src/tools/webSearchAdvanced.ts`), so protocol.
-- When an Exa error reaches the agent without a requestId, the diagnosis says so and points support at the Timestamp line instead. This changes wording, not the layer, so no score moved.
-- Removed an identity wrapper (`defineScenarios`) and a label no scenario used (`manual`; manual checks have their own file).
-- Added LICENSE and `.gitattributes`.
-- A new blind batch, variant-3 (8 cases), was written after these changes and scored once.
-
-Fresh clone: `git clone`, `npm ci`, `npm run setup`, `npm test`, `npm run lab` in a new folder, following only the README, run on the final commit. All tests pass and the scores match the run above.
-
-| Set | Evidence | Round 2 | Round 3 |
-|---|---|---|---|
-| generated | agent view | 28/32 | 28/32 |
-| generated | full | 32/32 | 32/32 |
-| real | agent view | 5/5 | 5/5 (not blind) |
-| variant | agent view | 13/14 | 13/14 (not blind) |
-| variant-2 | agent view | 10/12 (blind) | 12/12 (not blind) |
-| variant-3 | agent view | n/a | 5/8 (blind) |
-
-The blind variant-3 misses all hit the same weak rule: text in no known format falls back to client. It was right for the Nov 9 case, but it also caught `connect ETIMEDOUT` (network), a hosted HTTP 429 outside a tool result (exa-api) and "exited with code 1" (mcp-server). Rules were not changed after this score, so 5/8 stands as the current blind number.
-
-Next, if this continues: add those three patterns with sources, send unrecognized text to "unknown" instead of client, and score a new blind batch.
+Result: blind variant-3 5/8. All three misses hit one weak rule: text in no known format was blamed on the client. Right for the Nov 9 case, wrong for `connect ETIMEDOUT`, a production HTTP 429 and a crashed server process.
 
 ## Round 4: say unknown instead of guessing
 
-Changes, each traced to a source:
-- Text in no known format now gets "unknown", not client. Round 3's blind batch showed the client guess was wrong 3 times out of 3.
-- Text that mentions a "connector" is client. Claude and ChatGPT call remote MCP servers connectors, and Exa's server never sends the word (it appears only in source comments). This keeps the Nov 9 case and #61 right without the old fallback.
-- Node's system error codes for no response (ETIMEDOUT, EHOSTUNREACH, ENETUNREACH, EPIPE) count as network; "Cannot find module" counts as a server that never started; "exited with code" and kill signals count as a server process that died.
-- The scores now report wrong layers and unknowns separately.
-- An explicit compatibility matrix: every client and configuration, with automated, static, manual or not-run coverage.
-- A CI workflow (Node 20 and 22). It has not run yet because the repo is not pushed.
+What changed:
+- Text in no known format now gets "unknown", and the scores count unknown apart from a wrong layer.
+- Text mentioning a "connector" is client: Claude and ChatGPT call remote MCP servers connectors, and Exa's server never sends the word.
+- More of Node's no-response error codes count as network; "Cannot find module" means the server never started; "exited with code" and kill signals mean it died.
+- An explicit compatibility matrix and a CI workflow were added.
+- Checked against the account's request log: no request from the lab, so it spends no credits.
 
-A new blind batch, variant-4 (11 cases), was written after these changes and scored once.
+Result: blind variant-4 10/11. The miss: Node's "The operation was aborted due to timeout" was read as a server exception instead of network.
 
-| Set | Evidence | Round 3 | Round 4 |
-|---|---|---|---|
-| generated | agent view | 28/32 | 28/32 |
-| generated | full | 32/32 | 32/32 |
-| real | agent view | 5/5 | 5/5 (not blind) |
-| variant | agent view | 13/14 | 13/14, 1 unknown (not blind) |
-| variant-2 | agent view | 12/12 | 12/12 (not blind) |
-| variant-3 | agent view | 5/8 (blind) | 7/8, 1 unknown (not blind) |
-| variant-4 | agent view | n/a | 10/11 (blind) |
+## Round 5: an outside code review (2026-11-19)
 
-The two remaining unknowns used to be wrong answers (an Envoy proxy reset and a hosted HTTP 429 outside a tool result). The one blind variant-4 miss: "The operation was aborted due to timeout", Node's message when fetch gives up, was read as a server exception instead of network. Rules were not changed after this score.
+An outside review read the published code. Every finding was checked against the code before fixing:
+1. A server dying mid-call was misclassified. The SDK reports it as McpError -32000, which `observe.ts` labeled a protocol error, so the diagnosis said unknown. The old test built the observation by hand and missed it. A new integration test runs a stand-in server that dies on the call; it failed before the fix and passes after.
+2. `--only` skipped the opt-in flags, so `--only hosted-keyless-search` reached production without `--live`. Now it stops and names the missing flag.
+3. "Full" mode never read the server log, although the docs said it did. It now does: logged errors and warnings become facts, and if the server logged a successful finish but the agent got an error, the error came from the client side.
+4. "fetch failed" alone was rated certain. It is now "likely" unless the request log backs it up.
+5. Redaction only knew secret header names. Fields named like secrets (`apiKey`, `*Token`, `*Secret`, `password`) are now redacted at any depth.
+6. Full-mode accuracy was assisted by the lab's own knowledge of where each request went. The mode was renamed instrumented, with that limit stated next to its score.
 
-Credits check, 2026-11-15: the account's request log for the last 24 hours had no request from the lab or from Claude Code.
+Also: links in the report were unreadable in dark mode; fixed.
 
-Full run: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs. Tests: 51 passing.
+Result: a new blind batch, variant-5 (22 cases), added errors that look alike across layers and cases where the right answer is unknown. Score 20/22. Misses: a 120-second client timeout was read as network when the honest answer is unknown, and a TLS certificate error was blamed on the MCP server.
 
-## Published
+## Round 6: readability (2026-11-19)
 
-2026-11-19: pushed to GitHub and renamed to exa-mcp-triage. The first CI run passed on Ubuntu with Node 20 and 22: setup, typecheck, tests and the offline lab run.
+A second outside review read the docs and code for clarity. Nothing about behavior changed.
 
-## Round 5: an outside code review
+What changed:
+- One name per idea: "full" became "instrumented" everywhere; `UpstreamExchange` became `ApiRequestRecord`; `reachedApp` became `reachedExaApp`; the log of requests is `apiRequests` and a scenario's planned failure is `fakeApi` (both used to be called `upstream`); `coercedArgs` became `findChangedArguments`; the diagnosis helper `d()` became `createDiagnosis()`.
+- `diagnose.ts` is in four sections: error patterns, next steps, agent-view diagnosis, instrumented diagnosis.
+- The report is built one section per function, and its evaluation note is a short list with the latest blind score shown first.
+- The README explains the problem and the idea before any term, defines terms in plain words, and moves detail below a simpler findings table.
+- This history was rewritten from round notes into one timeline.
 
-An outside review of the published repo read the code, not the README. Every finding below was checked against the code before fixing.
+Proof that behavior did not change: a full run before and after was reduced to 381 lines (every scenario's verdict, checks, both diagnoses, request log and every scored case), and the two were identical. While restructuring, one path changed by accident (an Exa error with an unknown status); it was caught by comparing the old and new order rule by rule, restored, and covered by a test.
 
-1. Server death mid-call was misclassified. When the connection drops during a call, the MCP SDK rejects the pending request with McpError -32000 (ConnectionClosed). `observe.ts` labeled that an MCP protocol error, so the transport rule never ran and the diagnosis said unknown. The old test built the observation by hand and missed it. Fixed in `observe.ts`; a new integration test starts a stand-in server that dies on the call and checks the real `callTool` path end to end. It failed before the fix and passes after.
-2. `--only` skipped the opt-in flags, so `--only hosted-keyless-search` reached production without `--live`. Selection now always applies `--live` and `--slow`, and naming a scenario without its flag stops with a message.
-3. Full mode never read the server log, although the docs said it did. It now reads it: logged errors and API warnings become facts, and one rule uses it (the server logged a successful finish but the agent got an error, so the error came from the client side).
-4. "fetch failed" alone was rated certain. From the agent's text it is now "likely"; it becomes certain only when the request log backs it up.
-5. Redaction only knew secret header names. Object fields named like secrets (`apiKey`, `api_key`, `*Token`, `*Secret`, `password`) are now redacted at any depth.
-6. Full-mode accuracy was instrument-assisted: the fake API knows whether a request reached Exa's app because the lab decided it. The mode is now called instrumented everywhere, with that caveat stated next to its score.
+## Current limitations
 
-A new blind batch, variant-5 (22 cases), was written after these fixes and scored once. It adds overlapping cases (two layers producing similar text) and cases whose right answer is unknown, to test whether the diagnosis overclaims.
-
-| Set | Evidence | Round 4 | Round 5 |
-|---|---|---|---|
-| generated | agent view | 28/32 | 28/32 |
-| generated | instrumented | 32/32 | 32/32 |
-| real | agent view | 5/5 | 5/5 (not blind) |
-| variant-4 | agent view | 10/11 (blind) | 10/11 |
-| variant-5 | agent view | n/a | 20/22 (blind) |
-
-Blind variant-5 misses:
-- A client timeout of 120s was read as network; with only that text, the honest answer is unknown.
-- "unable to verify the first certificate" (TLS) was read as an MCP server exception. Together with round 4's "operation was aborted due to timeout", this shows the fallback for unrecognized "<tool> error: ..." text is now the weakest rule.
-
-Rules were not changed after this score. Tests: 60 passing. Full run on Windows: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs.
+- Agent view cannot see failures that return a normal result, such as #470. Instrumented mode can.
+- When a client gives up before the server's 60-second limit, the agent's text hides the real cause.
+- Unrecognized "`<tool> error: ...`" text is blamed on the MCP server; that was wrong for TLS and abort-timeout errors. A long client timeout is read as network when the honest answer is unknown. These are the next rules to change, followed by a new blind batch.
+- Instrumented scores assume perfect internal logs; real support would get them from Exa's own edge and app logs.
+- Claude Desktop, Cursor and ChatGPT are not tested yet. They need a person; steps are in `manual/README.md`.
+- Local results describe the pinned public code; production runs a newer version, covered only by the live checks.

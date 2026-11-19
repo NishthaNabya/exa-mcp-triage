@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diagnoseAgentView, diagnoseFull } from "../src/diagnose.js";
+import { diagnoseAgentView, diagnoseInstrumented } from "../src/diagnose.js";
 import type { Evidence, Observation } from "../src/types.js";
 
 const obs = (text: string, o: Partial<Observation> = {}): Observation => ({ outcome: "tool-error", isError: true, text, durationMs: 1, ...o });
@@ -74,46 +74,50 @@ describe("agent-view diagnosis, one case per rule", () => {
   });
 });
 
-describe("full diagnosis", () => {
+describe("instrumented diagnosis", () => {
   it("catches null coerced to 0 even though the agent saw success (#470)", () => {
-    const dx = diagnoseFull({
+    const dx = diagnoseInstrumented({
       tool: "web_search_advanced_exa",
       args: { query: "q", maxAgeHours: null },
       agent: obs("ok", { outcome: "success", isError: false }),
-      upstream: [{ method: "POST", path: "/search", headers: {}, body: { contents: { maxAgeHours: 0 } }, reachedApp: true, status: 200 }],
+      apiRequests: [{ method: "POST", path: "/search", headers: {}, body: { contents: { maxAgeHours: 0 } }, reachedExaApp: true, status: 200 }],
     });
     expect(dx.layer).toBe("mcp-server");
     expect(dx.confidence).toBe("certain");
   });
 
   it("follows renamed arguments into nested fields (#470, highlights)", () => {
-    const dx = diagnoseFull({
+    const dx = diagnoseInstrumented({
       tool: "web_search_advanced_exa",
       args: { query: "q", enableHighlights: true, highlightsMaxCharacters: null },
       agent: obs("ok", { outcome: "success", isError: false }),
-      upstream: [{ method: "POST", path: "/search", headers: {}, body: { contents: { highlights: { maxCharacters: 0 } } }, reachedApp: true, status: 200 }],
+      apiRequests: [{ method: "POST", path: "/search", headers: {}, body: { contents: { highlights: { maxCharacters: 0 } } }, reachedExaApp: true, status: 200 }],
     });
     expect(dx.layer).toBe("mcp-server");
   });
 
   it("blames the client when Exa's server logged a successful finish but the agent got an error", () => {
-    const dx = diagnoseFull({
+    const dx = diagnoseInstrumented({
       ...ev("Tool call failed: connection reset by gateway", { outcome: "tool-error" }),
       serverLog: ["[EXA-MCP-DEBUG] [web_search_exa-1] [web_search_exa] Successfully completed request"],
-      upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: true, status: 200 }],
+      apiRequests: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedExaApp: true, status: 200 }],
     });
     expect(dx.layer).toBe("client");
     expect(dx.facts).toContain("Server log: the call completed successfully");
   });
 
   it("reports logged API warnings as facts", () => {
-    const dx = diagnoseFull({
+    const dx = diagnoseInstrumented({
       ...ev("Title: A", { outcome: "success", isError: false }),
       serverLog: ["[x] [web_search_exa] Exa API warning IGNORED_FIELD at /startCrawlDate: ignored"],
-      upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: true, status: 200 }],
+      apiRequests: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedExaApp: true, status: 200 }],
     });
     expect(dx.layer).toBe("none");
     expect(dx.facts.join(" ")).toContain("IGNORED_FIELD at /startCrawlDate");
+  });
+
+  it("leaves an Exa error with an unknown status to the other rules", () => {
+    expect(diagnoseAgentView(ev("web_search_exa error (unknown): something odd")).rule).toBe("no-known-format");
   });
 
   it("is only 'likely' about a bare fetch failure from the agent's text", () => {
@@ -121,16 +125,16 @@ describe("full diagnosis", () => {
   });
 
   it("says edge when requests left the server but none reached Exa's app", () => {
-    const dx = diagnoseFull({
+    const dx = diagnoseInstrumented({
       ...ev("web_search_exa error (403): something"),
-      upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: false, status: 403 }],
+      apiRequests: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedExaApp: false, status: 403 }],
     });
     expect(dx.layer).toBe("edge");
   });
 
   it("uses Exa's log to tell a dropped connection from an unreachable API", () => {
-    const dropped = diagnoseFull({ ...ev("web_search_exa error: fetch failed"), upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: true }] });
-    const unreachable = diagnoseFull({ ...ev("web_search_exa error: fetch failed"), upstream: [] });
+    const dropped = diagnoseInstrumented({ ...ev("web_search_exa error: fetch failed"), apiRequests: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedExaApp: true }] });
+    const unreachable = diagnoseInstrumented({ ...ev("web_search_exa error: fetch failed"), apiRequests: [] });
     expect(dropped.layer).toBe("network");
     expect(unreachable.layer).toBe("network");
     expect(dropped.rule).not.toBe(unreachable.rule);

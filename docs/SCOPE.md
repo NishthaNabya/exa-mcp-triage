@@ -26,7 +26,7 @@ Given a failing Exa MCP call, tell a support engineer which layer failed, what t
 |---|---|---|
 | Fake Exa API | A small local server that answers like Exa's API, or fails on cue | Lets us run every failure for free and on demand. Exa's server reads `EXA_API_BASE_URL`, so no patching is needed. |
 | Real Exa MCP server, pinned | Exa's own code at commit `93c0d5e` (v3.4.3), built and run over stdio | We test what users actually run, not a copy. Pinning makes results reproducible. |
-| Scenario engine | Each scenario sets an upstream condition, makes a tool call and checks what came back | New cases are a few lines. The engine does not change. |
+| Scenario engine | Each scenario sets how the fake API fails, makes a tool call and checks what came back | New cases are a few lines. The engine does not change. |
 | What the agent saw | For each scenario, record whether the result is marked as an error, and whether it keeps the request ID, the tag and retry guidance | This is the core finding. A 200 or an MCP success is not proof the agent got what it needed. |
 | Layer diagnosis | Rules that read the evidence and name the layer: client, edge, MCP server, Exa API, network | This is the support skill, written down so it can be checked. |
 | Evaluation | A labeled set of cases with known answers, scored for accuracy, false positives and false negatives | A diagnosis tool is only useful if we know how often it is right. |

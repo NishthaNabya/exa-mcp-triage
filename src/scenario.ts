@@ -17,7 +17,7 @@ export interface Scenario {
   layer: LayerOrNone; // the layer we made fail, or "none". This is the answer key for evaluation.
   source?: string; // the issue, doc or probe it comes from
   target: "local" | "hosted";
-  upstream?: Routes; // local only: how the fake Exa API behaves
+  fakeApi?: Routes; // local only: how the fake Exa API behaves
   serverEnv?: Record<string, string>;
   apiBaseUrl?: string; // local only: overrides the fake API's address
   spawn?: Spawn; // local only: overrides how the server is started

@@ -34,15 +34,15 @@ export interface Observation {
 
 /**
  * One request the fake Exa API received. This plays the part of Exa's own request
- * log, so a request that an edge proxy answered (`reachedApp: false`) is the kind
+ * log, so a request that an edge proxy answered (`reachedExaApp: false`) is the kind
  * of request Exa's log would not contain.
  */
-export interface UpstreamExchange {
+export interface ApiRequestRecord {
   method: string;
   path: string;
   headers: Record<string, string>;
   body: unknown;
-  reachedApp: boolean;
+  reachedExaApp: boolean;
   status?: number; // missing when no response was sent (hang, dropped connection)
 }
 
@@ -53,7 +53,7 @@ export interface Evidence {
   agent: Observation;
   clientTimeoutMs?: number;
   serverLog?: string[];
-  upstream?: UpstreamExchange[];
+  apiRequests?: ApiRequestRecord[];
 }
 
 export interface Diagnosis {

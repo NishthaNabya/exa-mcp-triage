@@ -4,7 +4,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import { redactHeaders } from "../redact.js";
-import type { UpstreamExchange } from "../types.js";
+import type { ApiRequestRecord } from "../types.js";
 import { exaError } from "./bodies.js";
 
 export type Behavior =
@@ -20,12 +20,12 @@ export type Routes = Partial<Record<"/search" | "/contents", Behavior>>;
 
 export interface FakeExa {
   url: string;
-  exchanges: UpstreamExchange[];
+  requests: ApiRequestRecord[];
   close(): Promise<void>;
 }
 
 export async function startFakeExa(routes: Routes): Promise<FakeExa> {
-  const exchanges: UpstreamExchange[] = [];
+  const requests: ApiRequestRecord[] = [];
   const hits = new Map<string, number>();
   const sockets = new Set<Socket>();
 
@@ -38,14 +38,14 @@ export async function startFakeExa(routes: Routes): Promise<FakeExa> {
     const route = routes[path as keyof Routes];
     const behavior = route ? pick(route, n) : notFound;
     // Edge and proxy answers never reach Exa's app, so Exa's own log would not show them.
-    const reachedApp = behavior.kind !== "edge-html" && behavior.kind !== "non-json";
+    const reachedExaApp = behavior.kind !== "edge-html" && behavior.kind !== "non-json";
     const status = behavior.kind === "ok" ? 200 : "status" in behavior ? behavior.status : undefined;
-    exchanges.push({
+    requests.push({
       method: req.method ?? "GET",
       path,
       headers: redactHeaders(req.headers as Record<string, string>),
       body,
-      reachedApp,
+      reachedExaApp,
       ...(status !== undefined && { status }),
     });
     respond(res, behavior);
@@ -60,7 +60,7 @@ export async function startFakeExa(routes: Routes): Promise<FakeExa> {
 
   return {
     url: `http://127.0.0.1:${port}`,
-    exchanges,
+    requests,
     close: () =>
       new Promise((resolve) => {
         for (const s of sockets) s.destroy(); // releases hung requests

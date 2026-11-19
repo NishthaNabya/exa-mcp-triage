@@ -15,7 +15,7 @@ describe.skipIf(!existsSync(SERVER_BUNDLE))("against the pinned Exa MCP server",
   it("reproduces #470: null maxAgeHours reaches Exa as 0", async () => {
     const r = await runScenario(byId("max-age-null-forces-livecrawl"));
     expect(r.verdict).toBe("reproduced");
-    expect(r.diagnosis?.full.layer).toBe("mcp-server");
+    expect(r.diagnosis?.instrumented.layer).toBe("mcp-server");
   });
 
   it("reproduces the dropped requestId", async () => {
@@ -24,7 +24,7 @@ describe.skipIf(!existsSync(SERVER_BUNDLE))("against the pinned Exa MCP server",
     expect(r.observation?.text).toContain("(429)");
   });
 
-  it("never stores the key the server sends upstream", async () => {
+  it("never stores the key the server sends to Exa's API", async () => {
     const r = await runScenario(byId("default-search-request"));
     expect(r.verdict).toBe("pass");
     expect(JSON.stringify(r)).not.toContain(FAKE_KEY);

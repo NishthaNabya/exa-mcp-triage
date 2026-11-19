@@ -32,7 +32,7 @@ export interface HeldOutCase {
 
 const gh = (n: number, repo = "exa-mcp-server") => `https://github.com/exa-labs/${repo}/issues/${n}`;
 
-export const heldOut: HeldOutCase[] = [
+export const heldOutCases: HeldOutCase[] = [
   // ---- real, scored ----
   {
     id: "nov9-claude-connector",

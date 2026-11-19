@@ -30,12 +30,12 @@ if (values.list) {
 }
 
 if (values.serve) {
-  const s = scenarios.find((x) => x.id === values.serve && x.target === "local" && x.upstream);
+  const s = scenarios.find((x) => x.id === values.serve && x.target === "local" && x.fakeApi);
   if (!s) {
     console.error(`--serve needs a local scenario with a fake API, e.g. request-id-dropped. Run with --list.`);
     process.exit(2);
   }
-  const fake = await startFakeExa(s.upstream!);
+  const fake = await startFakeExa(s.fakeApi!);
   const config = {
     mcpServers: {
       "exa-mcp-triage": {
@@ -88,7 +88,7 @@ const run = await runLab(
     repeat: Math.max(1, Number(values.repeat) || 1),
     ...(only && { only }),
     onResult: (r) => {
-      const dx = r.diagnosis ? `  -> ${r.diagnosis.agentView.layer} / ${r.diagnosis.full.layer}` : "";
+      const dx = r.diagnosis ? `  -> ${r.diagnosis.agentView.layer} / ${r.diagnosis.instrumented.layer}` : "";
       console.log(`${MARK[r.verdict]} ${r.id} (${r.durationMs} ms)${dx}${r.labError ? `  ${r.labError}` : ""}`);
     },
   },

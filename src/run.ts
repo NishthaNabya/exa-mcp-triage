@@ -1,13 +1,13 @@
 // Runs scenarios: sets up the fake API and a server, does the action, records
 // everything, runs the checks and diagnoses the result.
 import { runChecks, type CheckContext, type CheckResult } from "./checks.js";
-import { diagnoseAgentView, diagnoseFull } from "./diagnose.js";
+import { diagnoseAgentView, diagnoseInstrumented } from "./diagnose.js";
 import { startFakeExa, type FakeExa } from "./fake-exa/server.js";
 import { callTool } from "./observe.js";
 import { redactDeep, redactText } from "./redact.js";
 import type { Scenario } from "./scenario.js";
 import { startHosted, startLocal, type Target } from "./targets.js";
-import type { Diagnosis, Evidence, Label, LayerOrNone, Observation, UpstreamExchange } from "./types.js";
+import type { Diagnosis, Evidence, Label, LayerOrNone, Observation, ApiRequestRecord } from "./types.js";
 
 export type Verdict = "reproduced" | "not-reproduced" | "pass" | "regressed" | "as-expected" | "unexpected" | "error";
 
@@ -23,12 +23,12 @@ export interface ScenarioResult {
   checks: CheckResult[];
   action: Scenario["action"];
   observation?: Observation;
-  upstream: UpstreamExchange[];
+  apiRequests: ApiRequestRecord[];
   serverLog: string[];
   server?: { name?: string; version?: string };
   tools?: { name: string; inputSchema: unknown }[];
   http?: CheckContext["http"];
-  diagnosis?: { agentView: Diagnosis; full: Diagnosis };
+  diagnosis?: { agentView: Diagnosis; instrumented: Diagnosis };
   repro: string;
   startedAt: string;
   durationMs: number;
@@ -42,7 +42,7 @@ let lastHostedCall = 0;
 export async function runScenario(s: Scenario): Promise<ScenarioResult> {
   const startedAt = new Date().toISOString();
   const t0 = performance.now();
-  const ctx: CheckContext = { upstream: [], serverLog: [] };
+  const ctx: CheckContext = { apiRequests: [], serverLog: [] };
   let fake: FakeExa | undefined;
   let target: Target | undefined;
   let labError: string | undefined;
@@ -52,7 +52,7 @@ export async function runScenario(s: Scenario): Promise<ScenarioResult> {
     if (s.action.type === "http-initialize") {
       ctx.http = await httpInitialize(s.action.url);
     } else {
-      if (s.target === "local") fake = await startFakeExa(s.upstream ?? {});
+      if (s.target === "local") fake = await startFakeExa(s.fakeApi ?? {});
       try {
         target =
           s.target === "local"
@@ -78,7 +78,7 @@ export async function runScenario(s: Scenario): Promise<ScenarioResult> {
     await target?.close().catch(() => {});
     ctx.serverLog = target?.serverLog ?? [];
     await fake?.close();
-    ctx.upstream = fake?.exchanges ?? [];
+    ctx.apiRequests = fake?.requests ?? [];
   }
 
   const checks = labError ? [] : runChecks(s.checks, ctx);
@@ -96,7 +96,7 @@ export async function runScenario(s: Scenario): Promise<ScenarioResult> {
     checks,
     action: s.action,
     ...(ctx.obs && { observation: ctx.obs }),
-    upstream: ctx.upstream,
+    apiRequests: ctx.apiRequests,
     serverLog: ctx.serverLog.filter((l) => !/DeprecationWarning|trace-deprecation/.test(l)),
     ...(ctx.server && { server: ctx.server }),
     ...(ctx.tools && { tools: ctx.tools }),
@@ -132,9 +132,9 @@ function diagnoseBoth(s: Scenario, ctx: CheckContext): ScenarioResult["diagnosis
     agent: ctx.obs!,
     clientTimeoutMs: s.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     serverLog: ctx.serverLog,
-    upstream: ctx.upstream,
+    apiRequests: ctx.apiRequests,
   };
-  return { agentView: diagnoseAgentView(evidence), full: diagnoseFull(evidence) };
+  return { agentView: diagnoseAgentView(evidence), instrumented: diagnoseInstrumented(evidence) };
 }
 
 async function httpInitialize(url: string): Promise<NonNullable<CheckContext["http"]>> {

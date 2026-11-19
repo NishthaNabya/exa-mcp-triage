@@ -1,5 +1,5 @@
 // Scores the diagnosis against cases with known answers.
-import { heldOut, type HeldOutCase } from "../eval/held-out.js";
+import { heldOutCases, type HeldOutCase } from "../eval/held-out.js";
 import { diagnoseAgentView } from "./diagnose.js";
 import type { ScenarioResult } from "./run.js";
 import { LAYERS, type Diagnosis, type LayerOrNone } from "./types.js";
@@ -38,13 +38,13 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
   for (const r of results) {
     if (!r.diagnosis || r.verdict === "error") continue;
     for (const mode of ["agent-view", "instrumented"] as const) {
-      const dx = mode === "agent-view" ? r.diagnosis.agentView : r.diagnosis.full;
+      const dx = mode === "agent-view" ? r.diagnosis.agentView : r.diagnosis.instrumented;
       items.push({ id: r.id, set: "generated", mode, expected: r.layer, predicted: dx.layer, rule: dx.rule });
     }
   }
 
   const unscored: Evaluation["unscored"] = [];
-  for (const c of heldOut) {
+  for (const c of heldOutCases) {
     const dx = diagnoseAgentView({
       tool: "unknown",
       args: {},
@@ -55,7 +55,7 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
     else items.push({ id: c.id, set: c.set, mode: "agent-view", expected: c.expected, predicted: dx.layer, rule: dx.rule });
   }
 
-  const heldOutSets = [...new Set(heldOut.map((c) => c.set))];
+  const heldOutSets = [...new Set(heldOutCases.map((c) => c.set))];
   const groups: [EvalItem["set"], EvalItem["mode"]][] = [
     ["generated", "agent-view"],
     ["generated", "instrumented"],
@@ -96,7 +96,7 @@ export function reproducibility(runs: ScenarioResult[][]): NonNullable<Evaluatio
   const byId = new Map<string, string[]>();
   for (const run of runs) {
     for (const r of run) {
-      const key = [r.verdict, r.diagnosis?.agentView.layer, r.diagnosis?.full.layer, ...r.checks.map((c) => c.pass)].join("|");
+      const key = [r.verdict, r.diagnosis?.agentView.layer, r.diagnosis?.instrumented.layer, ...r.checks.map((c) => c.pass)].join("|");
       byId.set(r.id, [...(byId.get(r.id) ?? []), key]);
     }
   }
