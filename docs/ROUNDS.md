@@ -122,6 +122,6 @@ A new blind batch, variant-4 (11 cases), was written after these changes and sco
 
 The two remaining unknowns used to be wrong answers (an Envoy proxy reset and a hosted HTTP 429 outside a tool result). The one blind variant-4 miss: "The operation was aborted due to timeout", Node's message when fetch gives up, was read as a server exception instead of network. Rules were not changed after this score.
 
-Credits check, 2026-11-15: the account's request log for the last 24 hours had 79 requests, all from claude.ai and ChatGPT sessions, none from Claude Code or the lab.
+Credits check, 2026-11-15: the account's request log for the last 24 hours had no request from the lab or from Claude Code.
 
 Full run: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs. Tests: 51 passing.
