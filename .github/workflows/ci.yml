@@ -30,3 +30,23 @@ jobs:
           path: |
             report/index.html
             runs/*.json
+      # Publish the report from one Node version only. Production checks are not run
+      # from CI: GitHub's datacenter IPs can be blocked by Cloudflare (#414, #446).
+      - if: matrix.node == 22 && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: report
+
+  pages:
+    needs: lab
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

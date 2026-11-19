@@ -15,6 +15,8 @@ The hard part is that the error can change as it travels back through those laye
 
 It does this against Exa's real MCP server code, not a copy, using a small local stand-in for Exa's API that fails on cue. It costs nothing to run and needs no API key.
 
+Live report, rebuilt by CI on every push: https://nishthanabya.github.io/exa-mcp-triage/ (offline run; production checks are run locally, see below).
+
 ![Report summary](docs/images/report-summary.jpg)
 
 ## One failure, start to finish
