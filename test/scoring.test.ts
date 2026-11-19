@@ -37,6 +37,14 @@ describe("score", () => {
     ]);
     expect(s).toMatchObject({ correct: 0, abstained: 1, wrong: 1, falsePositives: 0 });
   });
+
+  it("scores 'unknown' as right when the evidence cannot decide, and naming a layer as wrong", () => {
+    const s = score([
+      { id: "a", set: "variant-5", mode: "agent-view", expected: "unknown", predicted: "unknown", rule: "" },
+      { id: "b", set: "variant-5", mode: "agent-view", expected: "unknown", predicted: "client", rule: "" },
+    ]);
+    expect(s).toMatchObject({ correct: 1, abstained: 0, wrong: 1 });
+  });
 });
 
 describe("schema checks", () => {
@@ -63,6 +71,19 @@ describe("redaction", () => {
     expect(redactHeaders({ "x-api-key": "abc", Authorization: "Bearer xyz" })).toEqual({ "x-api-key": "[redacted]", Authorization: "[redacted]" });
     expect(redactText("https://mcp.exa.ai/mcp?exaApiKey=sk-12345678")).toBe("https://mcp.exa.ai/mcp?exaApiKey=[redacted]");
     expect(redactText("Authorization: Bearer abcdefgh12345")).toBe("Authorization: Bearer [redacted]");
+  });
+
+  it("redacts object fields whose name marks a secret, at any depth", () => {
+    const out = redactDeep({
+      exaApiKey: "k-1",
+      config: { api_key: "k-2", accessToken: "t-1", clientSecret: "s-1", password: "p-1" },
+      list: [{ token: "t-2" }],
+      maxTokens: 100, // a number, not a secret
+      query: "keep me",
+    });
+    expect(JSON.stringify(out)).not.toMatch(/k-1|k-2|t-1|t-2|s-1|p-1/);
+    expect(out.maxTokens).toBe(100);
+    expect(out.query).toBe("keep me");
   });
 
   it("removes the live EXA_API_KEY wherever it appears", () => {

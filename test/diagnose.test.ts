@@ -96,6 +96,30 @@ describe("full diagnosis", () => {
     expect(dx.layer).toBe("mcp-server");
   });
 
+  it("blames the client when Exa's server logged a successful finish but the agent got an error", () => {
+    const dx = diagnoseFull({
+      ...ev("Tool call failed: connection reset by gateway", { outcome: "tool-error" }),
+      serverLog: ["[EXA-MCP-DEBUG] [web_search_exa-1] [web_search_exa] Successfully completed request"],
+      upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: true, status: 200 }],
+    });
+    expect(dx.layer).toBe("client");
+    expect(dx.facts).toContain("Server log: the call completed successfully");
+  });
+
+  it("reports logged API warnings as facts", () => {
+    const dx = diagnoseFull({
+      ...ev("Title: A", { outcome: "success", isError: false }),
+      serverLog: ["[x] [web_search_exa] Exa API warning IGNORED_FIELD at /startCrawlDate: ignored"],
+      upstream: [{ method: "POST", path: "/search", headers: {}, body: {}, reachedApp: true, status: 200 }],
+    });
+    expect(dx.layer).toBe("none");
+    expect(dx.facts.join(" ")).toContain("IGNORED_FIELD at /startCrawlDate");
+  });
+
+  it("is only 'likely' about a bare fetch failure from the agent's text", () => {
+    expect(diagnoseAgentView(ev("web_search_exa error: fetch failed")).confidence).toBe("likely");
+  });
+
   it("says edge when requests left the server but none reached Exa's app", () => {
     const dx = diagnoseFull({
       ...ev("web_search_exa error (403): something"),

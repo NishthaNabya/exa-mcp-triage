@@ -12,7 +12,7 @@ REPRODUCED   request-id-dropped (96 ms)  -> exa-api / exa-api
 as expected  cloudflare-403 (97 ms)  -> edge / edge
 ```
 
-Each line shows the verdict, then the layer named by agent-view diagnosis and by full diagnosis.
+Each line shows the verdict, then the layer named by agent-view diagnosis and by instrumented diagnosis (which also reads the fake API's request log and the server's log).
 
 ## 1. The request ID that never arrives
 
@@ -51,7 +51,7 @@ The request the server actually sent to Exa:
 { "query": "test query", "type": "auto", "numResults": 10, "contents": { "text": true, "maxAgeHours": 0 } }
 ```
 
-Full diagnosis compares the agent's arguments with that request:
+Instrumented diagnosis compares the agent's arguments with that request:
 
 - Layer: mcp-server, certain
 - Facts: Exa's log has one request (status 200); agent sent `maxAgeHours: null`; Exa received 0
@@ -67,7 +67,7 @@ The fake API returns a Cloudflare block page with a `cf-ray` header. The agent g
 web_search_exa error (403): Request failed with status 403. Response body was not valid JSON: <!DOCTYPE html> <html><head><title>Attention Required! | Cloudflare</title>...
 ```
 
-Agent view says edge, because a web page came back where Exa's API returns JSON. Full mode says edge with certainty, because the request never reached Exa's app. A 403 is not retried.
+Agent view says edge, because a web page came back where Exa's API returns JSON. Instrumented mode says edge with certainty, because the request never reached Exa's app. A 403 is not retried.
 
 ## The case that started this
 

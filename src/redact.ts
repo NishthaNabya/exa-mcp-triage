@@ -1,6 +1,8 @@
 // Removes secrets from anything the lab stores or prints.
 
 const SECRET_HEADERS = new Set(["x-api-key", "authorization", "cookie", "set-cookie"]);
+// Object fields whose value is a secret by name, e.g. { exaApiKey: "...", token: "..." }.
+const SECRET_FIELD = /^(x-api-key|authorization|cookie|set-cookie|.*api[-_]?key|.*token|.*secret|password|passwd)$/i;
 const KEY_PARAM = /([?&](?:exaApiKey|api_key|apiKey|key|token)=)[^&\s"']+/gi;
 const BEARER = /(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g;
 
@@ -27,7 +29,7 @@ export function redactDeep<T>(value: T): T {
   if (Array.isArray(value)) return value.map(redactDeep) as T;
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, SECRET_HEADERS.has(k.toLowerCase()) ? "[redacted]" : redactDeep(v)]),
+      Object.entries(value).map(([k, v]) => [k, SECRET_FIELD.test(k) && typeof v === "string" ? "[redacted]" : redactDeep(v)]),
     ) as T;
   }
   return value;

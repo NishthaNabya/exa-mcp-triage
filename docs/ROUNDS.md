@@ -129,3 +129,30 @@ Full run: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproduci
 ## Published
 
 2026-11-19: pushed to GitHub and renamed to exa-mcp-triage. The first CI run passed on Ubuntu with Node 20 and 22: setup, typecheck, tests and the offline lab run.
+
+## Round 5: an outside code review
+
+An outside review of the published repo read the code, not the README. Every finding below was checked against the code before fixing.
+
+1. Server death mid-call was misclassified. When the connection drops during a call, the MCP SDK rejects the pending request with McpError -32000 (ConnectionClosed). `observe.ts` labeled that an MCP protocol error, so the transport rule never ran and the diagnosis said unknown. The old test built the observation by hand and missed it. Fixed in `observe.ts`; a new integration test starts a stand-in server that dies on the call and checks the real `callTool` path end to end. It failed before the fix and passes after.
+2. `--only` skipped the opt-in flags, so `--only hosted-keyless-search` reached production without `--live`. Selection now always applies `--live` and `--slow`, and naming a scenario without its flag stops with a message.
+3. Full mode never read the server log, although the docs said it did. It now reads it: logged errors and API warnings become facts, and one rule uses it (the server logged a successful finish but the agent got an error, so the error came from the client side).
+4. "fetch failed" alone was rated certain. From the agent's text it is now "likely"; it becomes certain only when the request log backs it up.
+5. Redaction only knew secret header names. Object fields named like secrets (`apiKey`, `api_key`, `*Token`, `*Secret`, `password`) are now redacted at any depth.
+6. Full-mode accuracy was instrument-assisted: the fake API knows whether a request reached Exa's app because the lab decided it. The mode is now called instrumented everywhere, with that caveat stated next to its score.
+
+A new blind batch, variant-5 (22 cases), was written after these fixes and scored once. It adds overlapping cases (two layers producing similar text) and cases whose right answer is unknown, to test whether the diagnosis overclaims.
+
+| Set | Evidence | Round 4 | Round 5 |
+|---|---|---|---|
+| generated | agent view | 28/32 | 28/32 |
+| generated | instrumented | 32/32 | 32/32 |
+| real | agent view | 5/5 | 5/5 (not blind) |
+| variant-4 | agent view | 10/11 (blind) | 10/11 |
+| variant-5 | agent view | n/a | 20/22 (blind) |
+
+Blind variant-5 misses:
+- A client timeout of 120s was read as network; with only that text, the honest answer is unknown.
+- "unable to verify the first certificate" (TLS) was read as an MCP server exception. Together with round 4's "operation was aborted due to timeout", this shows the fallback for unrecognized "<tool> error: ..." text is now the weakest rule.
+
+Rules were not changed after this score. Tests: 60 passing. Full run on Windows: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs.

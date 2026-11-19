@@ -25,8 +25,12 @@ export async function callTool(client: Client, name: string, args: unknown, time
   } catch (error) {
     const message = redactText(error instanceof Error ? error.message : String(error));
     if (error instanceof McpError) {
+      // The SDK reports a dropped connection as an McpError (-32000), but it is a transport
+      // failure, not an MCP protocol error, so classify it with the other transport errors.
+      const outcome =
+        error.code === ErrorCode.RequestTimeout ? "timeout" : error.code === ErrorCode.ConnectionClosed ? "transport-error" : "mcp-error";
       return {
-        outcome: error.code === ErrorCode.RequestTimeout ? "timeout" : "mcp-error",
+        outcome,
         isError: true,
         text: message,
         errorCode: error.code,

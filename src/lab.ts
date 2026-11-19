@@ -46,9 +46,15 @@ export interface LabOptions {
   onResult?: (r: ScenarioResult) => void;
 }
 
+/** Flags a scenario needs: --live for production, --slow for minute-long runs. --only never skips them. */
+export function requiredFlags(s: Scenario): string[] {
+  return [...(s.target === "hosted" ? ["--live"] : []), ...(s.slow ? ["--slow"] : [])];
+}
+
 export function selectScenarios(all: Scenario[], o: Pick<LabOptions, "live" | "slow" | "only">): Scenario[] {
-  if (o.only?.length) return all.filter((s) => o.only!.includes(s.id));
-  return all.filter((s) => (s.target === "local" || o.live) && (!s.slow || o.slow));
+  return all.filter(
+    (s) => (!o.only?.length || o.only.includes(s.id)) && (s.target === "local" || o.live) && (!s.slow || o.slow),
+  );
 }
 
 export async function runLab(all: Scenario[], o: LabOptions, root: string): Promise<LabRun> {

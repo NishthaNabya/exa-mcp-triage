@@ -49,7 +49,7 @@ Every diagnosis names one layer:
 | mcp-server | Exa's MCP server changed the request or the result |
 | exa-api | Exa's API returned an error or a partial result |
 
-The diagnosis runs in two modes. Agent view sees only what the agent saw, which is what a ticket usually contains. Full mode also sees Exa's request log (here, the fake API's log) and the server's log. Each diagnosis keeps the observed facts apart from the inference, and every rule cites the line of Exa's source or the live probe it comes from.
+The diagnosis runs in two modes. Agent view sees only what the agent saw, which is what a ticket usually contains. Instrumented mode also reads the fake API's request log (standing in for Exa's own edge and app logs) and the server's stderr: the request log decides where a request ended up, and the server log adds facts (logged errors and API warnings) and one rule (if the server logged a successful finish but the agent got an error, the error came from the client side). Each diagnosis keeps the observed facts apart from the inference, and every rule cites the line of Exa's source or the live probe it comes from.
 
 ## Run it
 
@@ -103,20 +103,23 @@ Checks always state the correct behavior. A reproduced defect is a scenario whos
 
 Numbers from the full run (`npm run lab -- --live --slow`). Full history in [docs/ROUNDS.md](docs/ROUNDS.md).
 
-| Set | What it is | Agent view | Full |
+| Set | What it is | Agent view | Instrumented |
 |---|---|---|---|
 | generated | the lab's own scenarios; the answer is known because we caused the failure | 28/32 | 32/32 |
 | real | error text from public reports with a confirmed cause, plus the Nov 9 case | 5/5 | |
-| variant-4 | 11 cases written after the last rule change and scored once | 10/11 | |
+| variant-5 | 22 cases written after the last rule change and scored once, including overlapping errors and cases where the right answer is unknown | 20/22 | |
 
-Only variant-4 is a blind score. The real cases were read before the rules were written, and each earlier variant batch was scored blind once and then used to fix rules, so treat those numbers as optimistic. The blind scores went 12/14, 10/12, 5/8, then 10/11 as the rules improved; [docs/ROUNDS.md](docs/ROUNDS.md) has each round.
+Read these numbers with their limits:
+- Agent view is the number that matters for customer tickets. It uses only the text the agent saw.
+- Instrumented is diagnosis with ideal internal visibility. It reads the fake API's request log, which knows whether a request reached Exa's app because the lab decided it when injecting the failure. In real support that would come from Exa's own edge and app logs. So 32/32 shows the rules are consistent with perfect logs, not that they can diagnose customer reports.
+- Only variant-5 is a blind score. The real cases were read before the rules were written, and each earlier variant batch was scored blind once and then used to fix rules. The blind scores went 12/14, 10/12, 5/8, 10/11, then 20/22.
 
-When the text matches no known format, the diagnosis says unknown instead of guessing, and the report counts that separately from a wrong layer. A wrong layer sends support the wrong way; unknown sends them to collect more evidence.
+When the text cannot decide the layer, the right answer is unknown, and variant-5 includes such cases. The report counts unknown separately from a wrong layer: a wrong layer sends support the wrong way; unknown sends them to collect more evidence.
 
 Known misses:
-- Agent view cannot see #470, because the agent gets a normal result. Full mode catches it.
+- Agent view cannot see #470, because the agent gets a normal result. Instrumented mode catches it.
 - When the client's timeout is shorter than the server's 60s, agent view can only blame the client; the real cause is hidden.
-- The one blind miss: Node's "The operation was aborted due to timeout" is read as a server exception, not a network timeout. That is the next rule to add, with a new blind batch after it.
+- Blind misses still open: any unrecognized "`<tool> error: ...`" text falls back to the MCP server, which was wrong for a TLS certificate error and for Node's "operation was aborted due to timeout". And a client timeout longer than the server's limit is read as network when the honest answer is unknown. Those are the next rules to change, with a new blind batch after them.
 
 ![Evaluation](docs/images/report-evaluation.jpg)
 
@@ -157,7 +160,8 @@ docs/           scope, PRD, build rounds, demo
 - The lab runs Exa's server as a separate process, the way an MCP client does, so it tests the built artifact and not private internals. Choices and rejected options are in [docs/PRD.md](docs/PRD.md).
 - In our local build, the server's analytics package (Agnost) is swapped for a no-op, so test runs send nothing to a third party and stay offline. Nothing under test goes through it. Setup also installs with `--ignore-scripts` and runs the server's esbuild command directly, because its build script ends in `chmod`, which fails on Windows.
 - Results describe the pinned public code. Production runs a newer version; the live scenarios and the drift table cover that gap.
-- The fake API's log stands in for Exa's own logs. Full mode assumes support can see whether a request reached Exa's app, as Exa's own edge and app logs would show.
+- The fake API's log stands in for Exa's own logs. Instrumented mode assumes support can see whether a request reached Exa's app, as Exa's own edge and app logs would show.
+- `--only` never skips the opt-in flags: a hosted scenario still needs `--live`, and a slow one still needs `--slow`.
 - Simulated scenarios show how the server reacts to a condition, not how often that condition happens.
 - No client other than this lab's MCP SDK client is tested automatically.
 - Running the lab spends no Exa credits: the pinned server only talks to the fake API, and live checks use the keyless tier. Checked against the account's request log on 2026-11-15: no request from the lab or from Claude Code.

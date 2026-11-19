@@ -40,7 +40,7 @@ code{padding:1px 5px}pre{padding:10px;overflow-x:auto;white-space:pre-wrap;word-
 .good{color:var(--good)}.bad{color:var(--bad)}.info{color:var(--info)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.card{background:var(--card);border-radius:10px;padding:12px}
 .card b{font-size:22px;display:block}details{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:8px 12px}
-summary{cursor:pointer}summary .tag{margin-left:6px}.wrap{overflow-x:auto}
+summary{cursor:pointer}summary .tag{margin-left:6px}.wrap{overflow-x:auto}a{color:var(--info)}
 </style></head><body><main>
 <h1>Exa MCP Triage</h1>
 <p class="muted">Run ${esc(run.meta.startedAt)} &middot; Node ${esc(run.meta.node)} &middot; ${esc(run.meta.platform)} &middot; Exa MCP server pinned at <code>${esc(run.meta.pinnedCommit.slice(0, 7))}</code>${run.drift?.hostedVersion ? ` &middot; hosted server reports ${esc(run.drift.hostedVersion)}` : ""} &middot; live: ${run.meta.options.live ? "yes" : "no"} &middot; slow: ${run.meta.options.slow ? "yes" : "no"}</p>
@@ -63,13 +63,13 @@ ${run.matrix.map((m) => `<tr><td>${esc(m.client)}</td><td>${esc(m.version)}</td>
 </table></div>
 
 <h2>What the agent saw</h2>
-<p class="muted">Each row is one failure we caused on purpose. The diagnosis columns show what the lab concluded from the agent's text alone, and from the agent's text plus Exa's request log.</p>
-<div class="wrap"><table><tr><th>Scenario</th><th>Caused at</th><th>Exa's log</th><th>Agent saw</th><th>Error?</th><th>Agent view</th><th>Full</th></tr>
+<p class="muted">Each row is one failure we caused on purpose. Agent view is what the lab concluded from the agent's text alone, which is what a ticket usually contains. Instrumented adds the fake API's request log and the server's log. The fake API knows where each request ended up because the lab decided it, so instrumented is diagnosis with ideal internal visibility, standing in for Exa's own edge and app logs.</p>
+<div class="wrap"><table><tr><th>Scenario</th><th>Caused at</th><th>Exa's log</th><th>Agent saw</th><th>Error?</th><th>Agent view</th><th>Instrumented</th></tr>
 ${calls.map((c) => `<tr><td><a href="#${esc(c.id)}">${esc(c.id)}</a></td><td>${esc(c.layer)}</td><td>${esc(upstreamSummary(c))}</td><td><code>${esc(clip(c.observation?.text, 140))}</code></td><td>${c.observation?.isError ? "yes" : "no"}</td><td>${dxCell(c.diagnosis!.agentView, c.layer)}</td><td>${dxCell(c.diagnosis!.full, c.layer)}</td></tr>`).join("")}
 </table></div>
 
 <h2>How often the diagnosis is right</h2>
-<p class="muted"><b>generated</b>: the failures above, where we know the answer because we caused it. <b>real</b>: error text from public reports and one first-hand case; these were read before the rules were written, so treat that score as optimistic. <b>variant</b>: written after the round-1 rules were frozen and scored blind in round 1 (12/14); the round-2 fixes were made after seeing them, so this score is no longer blind. <b>variant-2</b>: scored blind in round 2 (10/12), then used to fix two gaps, so no longer blind. <b>variant-3</b>: scored blind in round 3 (5/8), then used to change the fallback rule, so no longer blind. <b>variant-4</b>: written after the round-4 changes and scored once, blind. Only the latest batch is a blind score. See docs/ROUNDS.md.</p>
+<p class="muted"><b>generated</b>: the failures above, where we know the answer because we caused it. <b>real</b>: error text from public reports and one first-hand case; these were read before the rules were written, so treat that score as optimistic. <b>variant</b>: written after the round-1 rules were frozen and scored blind in round 1 (12/14); the round-2 fixes were made after seeing them, so this score is no longer blind. <b>variant-2</b>: scored blind in round 2 (10/12), then used to fix two gaps, so no longer blind. <b>variant-3</b>: scored blind in round 3 (5/8), then used to change the fallback rule, so no longer blind. <b>variant-4</b>: scored blind in round 4 (10/11). <b>variant-5</b>: written after the round-5 review fixes and scored once, blind; it includes overlapping cases and cases whose right answer is unknown, because the text cannot decide the layer. Only the latest batch is a blind score. See docs/ROUNDS.md.</p>
 <table><tr><th>Set</th><th>Evidence</th><th>Correct</th><th>Accuracy</th><th>Wrong layer</th><th>Said unknown</th><th>False positives</th><th>False negatives</th></tr>
 ${run.evaluation.scores.filter((s) => s.score.n).map((s) => `<tr><td>${esc(s.set)}</td><td>${esc(s.mode)}</td><td>${s.score.correct}/${s.score.n}</td><td>${pct(s.score.accuracy)}</td><td>${s.score.wrong}</td><td>${s.score.abstained}</td><td>${s.score.falsePositives}</td><td>${s.score.falseNegatives}</td></tr>`).join("")}
 </table>
@@ -148,7 +148,7 @@ ${s.observation ? `<p><b>Agent saw</b> (${esc(s.observation.outcome)}, isError $
 ${s.http ? `<p><b>HTTP response</b></p><pre>${esc(JSON.stringify({ status: s.http.status, headers: s.http.headers }, null, 2))}</pre>` : ""}
 ${s.upstream.length ? `<p><b>Requests the server sent to Exa's API</b></p><pre>${esc(JSON.stringify(s.upstream.map((u) => ({ path: u.path, reachedApp: u.reachedApp, status: u.status, body: u.body })), null, 2))}</pre>` : ""}
 ${s.serverLog.length ? `<details><summary>Server log (${s.serverLog.length} lines)</summary><pre>${esc(s.serverLog.join("\n"))}</pre></details>` : ""}
-${dx ? `<p><b>Diagnosis</b></p><table><tr><th></th><th>Agent view</th><th>Full</th></tr>
+${dx ? `<p><b>Diagnosis</b></p><table><tr><th></th><th>Agent view</th><th>Instrumented</th></tr>
 <tr><th>Layer</th><td>${esc(dx.agentView.layer)} (${esc(dx.agentView.confidence)})</td><td>${esc(dx.full.layer)} (${esc(dx.full.confidence)})</td></tr>
 <tr><th>Facts</th><td>${dx.agentView.facts.map(esc).join("<br>")}</td><td>${dx.full.facts.map(esc).join("<br>")}</td></tr>
 <tr><th>Inference</th><td>${esc(dx.agentView.inference ?? "")}</td><td>${esc(dx.full.inference ?? "")}</td></tr>

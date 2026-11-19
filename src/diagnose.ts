@@ -124,7 +124,8 @@ export function diagnoseAgentView(e: Evidence): Diagnosis {
   }
 
   if (EXA_PLAIN_ERROR.test(text)) {
-    if (NO_RESPONSE.test(text)) return d("network", "certain", "no-response", [quote(text)], "No HTTP response came back from Exa's API.");
+    // "fetch failed" alone could be DNS, a refused connection, TLS or a proxy, so only "likely".
+    if (NO_RESPONSE.test(text)) return d("network", "likely", "no-response", [quote(text)], "No HTTP response came back from Exa's API.");
     if (SERVER_TIMEOUT.test(text)) return d("network", "likely", "server-timeout", [quote(text)], "Exa's server stopped waiting for Exa's API.");
     // The tools' own input checks end like this (src/tools/webSearchAdvanced.ts).
     if (SERVER_REJECTED_INPUT.test(text)) return d("protocol", "certain", "server-rejected-input", [quote(text)], "The server refused an argument combination before calling Exa.");
@@ -151,7 +152,8 @@ export function diagnoseFull(e: Evidence): Diagnosis {
   const agentView = diagnoseAgentView(e);
   const log = e.upstream ?? [];
   const reached = log.filter((x) => x.reachedApp);
-  const facts = [...agentView.facts, ...logFacts(log)];
+  const server = readServerLog(e.serverLog ?? []);
+  const facts = [...agentView.facts, ...logFacts(log), ...server.facts];
 
   const coerced = coercedArgs(e.args, log);
   if (coerced.length > 0) {
@@ -160,6 +162,12 @@ export function diagnoseFull(e: Evidence): Diagnosis {
   }
 
   if (!e.agent.isError) return { ...agentView, facts };
+
+  // The server logged that it finished the call, yet the agent got an error: the error was
+  // added after the result left Exa's server.
+  if (server.completed && !server.errored) {
+    return d("client", "certain", "server-completed", facts, "Exa's server finished the call successfully, so the error came from the client side.");
+  }
 
   if (log.length > 0 && reached.length === 0) {
     return d("edge", "certain", "never-reached-app", facts, "Requests left the server but none reached Exa's app.");
@@ -177,6 +185,22 @@ export function diagnoseFull(e: Evidence): Diagnosis {
     return d(layerForStatus(last.status), "certain", "logged-status", facts);
   }
   return { ...agentView, facts };
+}
+
+/**
+ * What Exa's MCP server wrote to stderr for this call (src/utils/logger.ts and
+ * src/tools/searchNotes.ts): "Error: ...", "Successfully completed request", and API warnings.
+ */
+function readServerLog(lines: string[]) {
+  const errors = lines.flatMap((l) => l.match(/\] Error: (.*)$/)?.[1] ?? []);
+  const warnings = lines.flatMap((l) => l.match(/Exa API warning (\S+) at (\S+)/)?.slice(1, 3).join(" at ") ?? []);
+  const completed = lines.some((l) => l.includes("Successfully completed request"));
+  const facts = [
+    ...errors.map((m) => `Server log: error "${m}"`),
+    ...warnings.map((w) => `Server log: API warning ${w}, which the agent does not see`),
+    ...(completed ? ["Server log: the call completed successfully"] : []),
+  ];
+  return { facts, completed, errored: errors.length > 0 };
 }
 
 function logFacts(log: UpstreamExchange[]): string[] {

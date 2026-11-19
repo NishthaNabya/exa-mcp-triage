@@ -1,14 +1,16 @@
 // Scores the diagnosis against cases with known answers.
-import { heldOut } from "../eval/held-out.js";
+import { heldOut, type HeldOutCase } from "../eval/held-out.js";
 import { diagnoseAgentView } from "./diagnose.js";
 import type { ScenarioResult } from "./run.js";
 import { LAYERS, type Diagnosis, type LayerOrNone } from "./types.js";
 
 export interface EvalItem {
   id: string;
-  set: "generated" | "real" | "variant" | "variant-2" | "variant-3" | "variant-4";
-  mode: "agent-view" | "full";
-  expected: LayerOrNone;
+  set: "generated" | HeldOutCase["set"];
+  // agent-view: only what the agent saw. instrumented: also the fake API's request log,
+  // which knows where each request ended up because the lab decided it.
+  mode: "agent-view" | "instrumented";
+  expected: Diagnosis["layer"]; // "unknown" when the evidence cannot decide, so abstaining is right
   predicted: Diagnosis["layer"];
   rule: string;
 }
@@ -35,7 +37,7 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
   const items: EvalItem[] = [];
   for (const r of results) {
     if (!r.diagnosis || r.verdict === "error") continue;
-    for (const mode of ["agent-view", "full"] as const) {
+    for (const mode of ["agent-view", "instrumented"] as const) {
       const dx = mode === "agent-view" ? r.diagnosis.agentView : r.diagnosis.full;
       items.push({ id: r.id, set: "generated", mode, expected: r.layer, predicted: dx.layer, rule: dx.rule });
     }
@@ -53,15 +55,12 @@ export function evaluate(results: ScenarioResult[]): Evaluation {
     else items.push({ id: c.id, set: c.set, mode: "agent-view", expected: c.expected, predicted: dx.layer, rule: dx.rule });
   }
 
-  const groups = [
+  const heldOutSets = [...new Set(heldOut.map((c) => c.set))];
+  const groups: [EvalItem["set"], EvalItem["mode"]][] = [
     ["generated", "agent-view"],
-    ["generated", "full"],
-    ["real", "agent-view"],
-    ["variant", "agent-view"],
-    ["variant-2", "agent-view"],
-    ["variant-3", "agent-view"],
-    ["variant-4", "agent-view"],
-  ] as const;
+    ["generated", "instrumented"],
+    ...heldOutSets.map((set) => [set, "agent-view"] as [EvalItem["set"], EvalItem["mode"]]),
+  ];
   const scores = groups.map(([set, mode]) => ({ set, mode, score: score(items.filter((i) => i.set === set && i.mode === mode)) }));
   return { items, scores, unscored };
 }
@@ -77,7 +76,9 @@ export function score(items: EvalItem[]): Score {
       return { layer, n: actual, precision: predicted ? tp / predicted : null, recall: actual ? tp / actual : null };
     })
     .filter((l) => l.n > 0 || l.precision !== null);
-  const abstained = items.filter((i) => i.predicted === "unknown").length;
+  // Abstained: said "unknown" where the answer was knowable. Saying "unknown" where it
+  // was not knowable is correct. Naming a layer where it was not knowable is wrong.
+  const abstained = items.filter((i) => i.predicted === "unknown" && i.expected !== "unknown").length;
   return {
     n: items.length,
     correct,
@@ -85,7 +86,7 @@ export function score(items: EvalItem[]): Score {
     abstained,
     wrong: items.length - correct - abstained,
     falsePositives: items.filter((i) => i.expected === "none" && i.predicted !== "none" && i.predicted !== "unknown").length,
-    falseNegatives: items.filter((i) => i.expected !== "none" && i.predicted === "none").length,
+    falseNegatives: items.filter((i) => i.expected !== "none" && i.expected !== "unknown" && i.predicted === "none").length,
     perLayer,
   };
 }

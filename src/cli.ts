@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { startFakeExa } from "./fake-exa/server.js";
-import { runLab } from "./lab.js";
+import { requiredFlags, runLab } from "./lab.js";
 import { FAKE_KEY, SERVER_BUNDLE } from "./targets.js";
 import { redactDeep } from "./redact.js";
 import { renderHtml } from "./report.js";
@@ -56,6 +56,17 @@ const only = values.only?.split(",").map((s) => s.trim()).filter(Boolean);
 const unknown = only?.filter((id) => !scenarios.some((s) => s.id === id)) ?? [];
 if (unknown.length) {
   console.error(`Unknown scenario id(s): ${unknown.join(", ")}. Run with --list to see them.`);
+  process.exit(2);
+}
+
+// Live and slow runs stay opt-in, even when a scenario is picked by id.
+const given = new Set([...(values.live ? ["--live"] : []), ...(values.slow ? ["--slow"] : [])]);
+const blocked = scenarios
+  .filter((s) => only?.includes(s.id))
+  .map((s) => ({ id: s.id, missing: requiredFlags(s).filter((f) => !given.has(f)) }))
+  .filter((b) => b.missing.length);
+if (blocked.length) {
+  for (const b of blocked) console.error(`${b.id} needs ${b.missing.join(" and ")}.`);
   process.exit(2);
 }
 
