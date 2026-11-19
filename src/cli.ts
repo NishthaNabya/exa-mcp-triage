@@ -38,7 +38,7 @@ if (values.serve) {
   const fake = await startFakeExa(s.upstream!);
   const config = {
     mcpServers: {
-      "exa-fault-lab": {
+      "exa-mcp-triage": {
         command: "node",
         args: [SERVER_BUNDLE],
         env: { EXA_API_KEY: FAKE_KEY, EXA_API_BASE_URL: fake.url, ...s.serverEnv },

@@ -26,7 +26,7 @@ export function renderHtml(run: LabRun): string {
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Exa MCP Fault Lab report</title>
+<title>Exa MCP Triage report</title>
 <style>
 :root{--bg:#fff;--fg:#1d1d1f;--muted:#6b6b70;--line:#e3e3e6;--card:#f7f7f8;--good:#1f7a4d;--bad:#b42318;--info:#365fae;--code:#f1f1f3}
 @media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececef;--muted:#9a9aa1;--line:#2c2c31;--card:#1c1c20;--good:#5cc28d;--bad:#ff7b6b;--info:#8fb0f5;--code:#232328}}
@@ -42,7 +42,7 @@ code{padding:1px 5px}pre{padding:10px;overflow-x:auto;white-space:pre-wrap;word-
 .card b{font-size:22px;display:block}details{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:8px 12px}
 summary{cursor:pointer}summary .tag{margin-left:6px}.wrap{overflow-x:auto}
 </style></head><body><main>
-<h1>Exa MCP Fault Lab</h1>
+<h1>Exa MCP Triage</h1>
 <p class="muted">Run ${esc(run.meta.startedAt)} &middot; Node ${esc(run.meta.node)} &middot; ${esc(run.meta.platform)} &middot; Exa MCP server pinned at <code>${esc(run.meta.pinnedCommit.slice(0, 7))}</code>${run.drift?.hostedVersion ? ` &middot; hosted server reports ${esc(run.drift.hostedVersion)}` : ""} &middot; live: ${run.meta.options.live ? "yes" : "no"} &middot; slow: ${run.meta.options.slow ? "yes" : "no"}</p>
 
 <div class="cards">

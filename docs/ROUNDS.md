@@ -125,3 +125,7 @@ The two remaining unknowns used to be wrong answers (an Envoy proxy reset and a 
 Credits check, 2026-11-15: the account's request log for the last 24 hours had no request from the lab or from Claude Code.
 
 Full run: 36 scenarios, 0 regressed, 0 unexpected, 0 lab errors, 31/31 reproducible across 3 runs. Tests: 51 passing.
+
+## Published
+
+2026-11-19: pushed to GitHub and renamed to exa-mcp-triage. The first CI run passed on Ubuntu with Node 20 and 22: setup, typecheck, tests and the offline lab run.

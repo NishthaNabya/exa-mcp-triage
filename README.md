@@ -1,4 +1,4 @@
-# Exa MCP Fault Lab
+# Exa MCP Triage
 
 When an AI agent calls Exa through MCP and something goes wrong, the error passes through several layers before anyone sees it: Exa's API, Cloudflare in front of it, Exa's MCP server, and the agent's own client. Each layer can rewrite or drop the error. By the time a developer files a ticket, all support has is the text the agent saw.
 
@@ -56,6 +56,14 @@ The diagnosis runs in two modes. Agent view sees only what the agent saw, which 
 You need Node 20 or later and git.
 
 ```bash
+git clone https://github.com/NishthaNabya/exa-mcp-triage.git
+```
+
+```bash
+cd exa-mcp-triage
+```
+
+```bash
 npm ci
 ```
 
@@ -78,7 +86,7 @@ npm run lab
 | `--list` | list all scenarios |
 | `--serve id` | start one scenario's fake API, for a manual test in a real client |
 
-Run the lab's own tests with `npm test`. `.github/workflows/ci.yml` runs setup, typecheck, tests and an offline lab run on Node 20 and 22. It has not run yet, because the repo has not been pushed.
+Run the lab's own tests with `npm test`. On every push, `.github/workflows/ci.yml` runs setup, typecheck, tests and an offline lab run on Ubuntu with Node 20 and 22, and keeps the report as a downloadable artifact.
 
 ## How every result is labeled
 

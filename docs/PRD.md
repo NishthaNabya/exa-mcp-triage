@@ -1,4 +1,4 @@
-# Exa MCP Fault Lab: product requirements
+# Exa MCP Triage: product requirements
 
 ## Who it is for
 

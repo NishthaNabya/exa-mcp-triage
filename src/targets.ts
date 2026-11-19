@@ -23,7 +23,7 @@ export interface Target {
   close(): Promise<void>;
 }
 
-const clientInfo = { name: "exa-mcp-fault-lab", version: "0.1.0" };
+const clientInfo = { name: "exa-mcp-triage", version: "0.1.0" };
 
 /** How to start the server. Scenarios override this to simulate a broken setup. */
 export interface Spawn {

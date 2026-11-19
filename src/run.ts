@@ -145,7 +145,7 @@ async function httpInitialize(url: string): Promise<NonNullable<CheckContext["ht
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
-      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "exa-mcp-fault-lab", version: "0.1.0" } },
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "exa-mcp-triage", version: "0.1.0" } },
     }),
     signal: AbortSignal.timeout(15_000),
   });

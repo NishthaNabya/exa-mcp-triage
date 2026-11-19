@@ -19,7 +19,7 @@ The automated lab shows what Exa's MCP server sends. These checks show what a re
 3. Add that entry to the client's MCP config and restart the client.
    - Claude Desktop: Settings > Developer > Edit Config (`claude_desktop_config.json`).
    - Cursor: Settings > MCP > Add new MCP server, or `.cursor/mcp.json`.
-4. Ask the agent to use the tool the scenario names, for example: "Search the web for test query using exa-fault-lab."
+4. Ask the agent to use the tool the scenario names, for example: "Search the web for test query using exa-mcp-triage."
 5. Take a screenshot of what the client shows. Save it under `manual/evidence/`.
 
 ## Checks

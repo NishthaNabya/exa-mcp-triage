@@ -1,4 +1,4 @@
-# Exa MCP Fault Lab: scope
+# Exa MCP Triage: scope
 
 ## The idea in one paragraph
 
